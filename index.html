@@ -323,7 +323,7 @@ function findErrezeta(id){ return errezetak.find(e => e.id === id); }
 function renderList(){
   const el = document.getElementById('recipeList');
   if (errezetak.length === 0){
-    el.innerHTML = '<div class="empty-state"><div class="glyph">&#127859;</div>Oiñekarren z dau errezetarik.<br>Sakatu + botoia lehen errezeta sortzeko.</div>';
+    el.innerHTML = '<div class="empty-state"><div class="glyph">&#127859;</div>Oiñekarren ez dau errezetarik.<br>Sakatu + botoia lehen errezeta sortzeko.</div>';
     return;
   }
   el.innerHTML = errezetak.map(e => {
