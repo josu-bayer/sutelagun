@@ -196,27 +196,27 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
     <button class="topbar-back" id="btnAtzera">&larr;</button>
     <div class="recipe-header">
       <h2 id="errezetaIzena"></h2>
-      <button class="btn btn-icon" id="btnEditatuIreki" title="Editatu">&#9998;</button>
+      <button class="btn btn-icon" id="btnEditatuIreki" title="Editeu">&#9998;</button>
     </div>
     <div class="tag-row" id="errezetaEtiketak"></div>
 
-    <div class="section-title">Osagaiak</div>
+    <div class="section-title">Osagaiek</div>
     <ul class="ingredient-list" id="osagaiList"></ul>
 
-    <div class="section-title">Urratsak</div>
+    <div class="section-title">Urratsek</div>
     <ol class="step-list" id="urratsList" style="list-style:none;padding:0;margin:0"></ol>
   </div>
 
-  <button class="fab fab-new" id="btnErrezetaBerria" title="Errezeta berria">+</button>
+  <button class="fab fab-new" id="btnErrezetaBerria" title="Errezeta barria">+</button>
 
   <!-- Edit / create modal -->
   <div class="modal-overlay" id="modalEditatu">
     <div class="modal">
       <div class="modal-scroll-body">
-        <h2 id="modalEditatuTitulua">Errezeta berria</h2>
+        <h2 id="modalEditatuTitulua">Errezeta barria</h2>
 
         <div class="seg" id="editatuSeg" style="display:none">
-          <button class="seg-btn active" data-seg="editatu">Editatu</button>
+          <button class="seg-btn active" data-seg="editatu">Editeu</button>
           <button class="seg-btn" data-seg="historia">Historia</button>
         </div>
 
@@ -226,25 +226,25 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
             <input type="text" id="inputIzena" placeholder="Adib. Amaren tarta">
           </div>
           <div class="field">
-            <label>Etiketak (komaz bereizita)</label>
-            <input type="text" id="inputEtiketak" placeholder="Adib. gozoa, oporrak">
+            <label>Etiketak (komaz bereizitte)</label>
+            <input type="text" id="inputEtiketak" placeholder="Adib. goxoa, oporrak">
           </div>
 
-          <div class="section-title">Osagaiak</div>
+          <div class="section-title">Osagaiek</div>
           <div id="osagaiRows"></div>
-          <button class="add-row-btn" id="btnGehituOsagaia">+ Osagaia gehitu</button>
+          <button class="add-row-btn" id="btnGehituOsagaia">+ Osagaie gehitu</button>
 
-          <div class="section-title">Urratsak</div>
+          <div class="section-title">Urratsek</div>
           <div id="urratsRows"></div>
-          <button class="add-row-btn" id="btnGehituUrratsa">+ Urratsa gehitu</button>
+          <button class="add-row-btn" id="btnGehituUrratsa">+ Urratse gehitu</button>
 
           <div class="section-title" id="oharraTitle">Aldaketaren oharra</div>
           <div class="field" id="oharraField">
-            <label id="oharraLabel">Zer aldatu duzu eta zergatik?</label>
-            <textarea id="inputOharra" placeholder="Adib. 10 minutu gehiago labean, hobeto geratzen da"></textarea>
+            <label id="oharraLabel">Zer kanbieu dozu eta zergaittik?</label>
+            <textarea id="inputOharra" placeholder="Adib. 10 minutu gehiau labian, hobau lotzen da"></textarea>
           </div>
           <div class="field">
-            <label>Balorazioa (aukerakoa)</label>
+            <label>Baloraziñue (hautazkue)</label>
             <div class="stars" id="starPicker">
               <button type="button" class="star-btn" data-val="1">&#9733;</button>
               <button type="button" class="star-btn" data-val="2">&#9733;</button>
@@ -264,7 +264,7 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
       <div class="modal-actions-fixed">
         <div class="modal-actions">
           <button class="btn btn-ghost" id="btnEditatuUtzi">Utzi</button>
-          <button class="btn btn-primary" id="btnEditatuGorde">Gorde saiakera berri gisa</button>
+          <button class="btn btn-primary" id="btnEditatuGorde">Gorde saiakera barrilez</button>
         </div>
       </div>
     </div>
@@ -319,7 +319,7 @@ function findErrezeta(id){ return errezetak.find(e => e.id === id); }
 function renderList(){
   const el = document.getElementById('recipeList');
   if (errezetak.length === 0){
-    el.innerHTML = '<div class="empty-state"><div class="glyph">&#127859;</div>Ez dago errezetarik oraindik.<br>Sakatu + botoia lehen errezeta sortzeko.</div>';
+    el.innerHTML = '<div class="empty-state"><div class="glyph">&#127859;</div>Oiñekarren z dau errezetarik.<br>Sakatu + botoia lehen errezeta sortzeko.</div>';
     return;
   }
   el.innerHTML = errezetak.map(e => {
@@ -349,13 +349,13 @@ function renderErrezetaView(){
   document.getElementById('errezetaEtiketak').innerHTML = (e.etiketak||[]).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('');
   document.getElementById('osagaiList').innerHTML = (b.osagaiak||[]).map(o =>
     `<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${escapeHtml(o.izena||'')}</span></li>`
-  ).join('') || '<li style="color:var(--muted)">Ez dago osagairik.</li>';
+  ).join('') || '<li style="color:var(--muted)">Ez dau osagairik.</li>';
   document.getElementById('urratsList').innerHTML = (b.urratsak||[]).map((u,i) => {
     const badges = [];
     if (u.denbora) badges.push(`<span class="step-badge">&#9200; ${escapeHtml(u.denbora)}</span>`);
     if (u.teknika) badges.push(`<span class="step-badge">${escapeHtml(u.teknika)}</span>`);
     return `<li class="step-item"><div class="step-num">${i+1}</div><div class="step-body"><p>${escapeHtml(u.jarraibidea||'')}</p>${badges.length ? `<div class="step-badges">${badges.join('')}</div>` : ''}</div></li>`;
-  }).join('') || '<li style="color:var(--muted)">Ez dago urratsik.</li>';
+  }).join('') || '<li style="color:var(--muted)">Ez dau urratsik.</li>';
 }
 
 function escapeHtml(s){
@@ -374,7 +374,7 @@ function openModalBerria(){
   editatuMode = 'berria';
   editatuErrezetaId = null;
   draft = { izena:'', etiketak:[], osagaiak:[{izena:'',kopurua:'',unitatea:''}], urratsak:[{jarraibidea:'',denbora:'',teknika:''}], oharra:'', balorazioa:0 };
-  document.getElementById('modalEditatuTitulua').textContent = 'Errezeta berria';
+  document.getElementById('modalEditatuTitulua').textContent = 'Errezeta barria';
   document.getElementById('editatuSeg').style.display = 'none';
   switchSeg('editatu');
   document.getElementById('inputIzena').value = '';
@@ -410,7 +410,7 @@ function openModalEditatu(){
   document.getElementById('oharraTitle').style.display = '';
   document.getElementById('oharraField').style.display = '';
   document.getElementById('btnEzabatuErrezeta').style.display = '';
-  document.getElementById('btnEditatuGorde').textContent = 'Gorde saiakera berri gisa';
+  document.getElementById('btnEditatuGorde').textContent = 'Gorde saiakera barrilez';
   setStars(0);
   renderOsagaiRows();
   renderUrratsRows();
@@ -453,8 +453,8 @@ function renderOsagaiRows(){
     <div class="dyn-row">
       <div class="fields">
         <div class="row-2">
-          <div class="field"><input class="f-kopurua" placeholder="Kopurua" value="${escapeHtml(o.kopurua||'')}"></div>
-          <div class="field"><input class="f-unitatea" placeholder="Unitatea" value="${escapeHtml(o.unitatea||'')}"></div>
+          <div class="field"><input class="f-kopurua" placeholder="Kopurue" value="${escapeHtml(o.kopurua||'')}"></div>
+          <div class="field"><input class="f-unitatea" placeholder="Unitatie" value="${escapeHtml(o.unitatea||'')}"></div>
         </div>
         <div class="field"><input class="f-osagai-izena" placeholder="Osagaiaren izena" value="${escapeHtml(o.izena||'')}"></div>
       </div>
@@ -482,8 +482,8 @@ function renderUrratsRows(){
       <div class="fields">
         <div class="field"><textarea class="f-jarraibidea" placeholder="Jarraibidea">${escapeHtml(u.jarraibidea||'')}</textarea></div>
         <div class="row-2">
-          <div class="field"><input class="f-denbora" placeholder="Denbora (aukerakoa)" value="${escapeHtml(u.denbora||'')}"></div>
-          <div class="field"><input class="f-teknika" placeholder="Teknika (aukerakoa)" value="${escapeHtml(u.teknika||'')}"></div>
+          <div class="field"><input class="f-denbora" placeholder="Denpora (hautazkue)" value="${escapeHtml(u.denbora||'')}"></div>
+          <div class="field"><input class="f-teknika" placeholder="Teknika (hautazkue)" value="${escapeHtml(u.teknika||'')}"></div>
         </div>
       </div>
       <div class="controls">
@@ -526,7 +526,7 @@ document.querySelectorAll('.star-btn').forEach(b => b.addEventListener('click', 
 function renderHistoria(){
   const e = findErrezeta(editatuErrezetaId);
   const el = document.getElementById('historiaList');
-  if (!e || !(e.bertsioak||[]).length){ el.innerHTML = '<p style="color:var(--muted)">Oraindik ez dago saiakerarik gordeta.</p>'; return; }
+  if (!e || !(e.bertsioak||[]).length){ el.innerHTML = '<p style="color:var(--muted)">Oraindik ez dau saiakerarik gordeta.</p>'; return; }
   el.innerHTML = e.bertsioak.map((b,i) => {
     const isUneko = i === e.unekoa;
     const stars = b.balorazioa ? '&#9733;'.repeat(b.balorazioa) : '';
@@ -534,16 +534,16 @@ function renderHistoria(){
     return `<div class="panel history-item" data-i="${i}">
       <div class="top-row">
         <span class="date">${data}</span>
-        ${isUneko ? '<span class="history-badge">Uneko bertsioa</span>' : ''}
+        ${isUneko ? '<span class="history-badge">Bertsiño eguneratue</span>' : ''}
       </div>
       ${stars ? `<div style="color:var(--gold);font-size:0.85rem">${stars}</div>` : ''}
       ${b.oharra ? `<div class="note">${escapeHtml(b.oharra)}</div>` : ''}
       <div class="history-detail" style="display:none">
-        <div class="section-title" style="margin-top:0">Osagaiak</div>
+        <div class="section-title" style="margin-top:0">Osagaiek</div>
         <ul class="ingredient-list">${(b.osagaiak||[]).map(o=>`<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${escapeHtml(o.izena||'')}</span></li>`).join('')}</ul>
-        <div class="section-title">Urratsak</div>
+        <div class="section-title">Urratsek</div>
         <ol class="step-list" style="list-style:none;padding:0;margin:0">${(b.urratsak||[]).map((u,si)=>`<li class="step-item"><div class="step-num">${si+1}</div><div class="step-body"><p>${escapeHtml(u.jarraibidea||'')}</p></div></li>`).join('')}</ol>
-        ${isUneko ? '' : `<button class="btn btn-primary btn-block" data-restore="${i}" style="margin-top:12px">Berreskuratu bertsio hau</button>`}
+        ${isUneko ? '' : `<button class="btn btn-primary btn-block" data-restore="${i}" style="margin-top:12px">Berreskuratu bertsiño hau</button>`}
       </div>
     </div>`;
   }).join('');
@@ -557,7 +557,7 @@ function renderHistoria(){
     const idx = Number(btn.dataset.restore);
     const e = findErrezeta(editatuErrezetaId);
     await setDoc(doc(db,'errezetak',e.id), { unekoa: idx }, { merge:true });
-    showToast('Bertsio zaharra berrezarri da.');
+    showToast('Bertsiño zarra berrezarri da.');
     closeModal();
   }));
 }
@@ -568,7 +568,7 @@ document.getElementById('btnEditatuUtzi').addEventListener('click', closeModal);
 
 document.getElementById('btnEditatuGorde').addEventListener('click', async () => {
   syncDraftFromDom();
-  if (!draft.izena.trim()){ showToast('Jarri errezetari izen bat.'); return; }
+  if (!draft.izena.trim()){ showToast('Jarri izen bat errezetari.'); return; }
   const osagaiak = draft.osagaiak.filter(o => o.izena && o.izena.trim());
   const urratsak = draft.urratsak.filter(u => u.jarraibidea && u.jarraibidea.trim());
   const bertsioaBerria = { noiz: new Date().toISOString(), oharra: draft.oharra.trim(), balorazioa: draft.balorazioa || null, osagaiak, urratsak };
@@ -581,13 +581,13 @@ document.getElementById('btnEditatuGorde').addEventListener('click', async () =>
     const e = findErrezeta(editatuErrezetaId);
     const bertsioak = [...(e.bertsioak||[]), bertsioaBerria];
     await setDoc(doc(db,'errezetak',e.id), { izena: draft.izena.trim(), etiketak: draft.etiketak, unekoa: bertsioak.length - 1, bertsioak }, { merge:true });
-    showToast('Saiakera berria gorde da.');
+    showToast('Saiakera barria gorde da.');
   }
   closeModal();
 });
 
 document.getElementById('btnEzabatuErrezeta').addEventListener('click', async () => {
-  if (!confirm('Ziur zaude errezeta hau ezabatu nahi duzula? Ezin da desegin.')) return;
+  if (!confirm('Ziur zauz errezeta hau ezabatu gure douzule? Ezin da desegin.')) return;
   await deleteDoc(doc(db,'errezetak',editatuErrezetaId));
   closeModal();
   unekoErrezetaId = null;
