@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#17110d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sutelagun">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="manifest" href="manifest.json">
+<title>Sutelagun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#17110d;
+  --bg-2:#0d0908;
+  --panel:#241a14;
+  --panel-border:#43301f;
+  --line-soft:rgba(255,255,255,0.08);
+  --ink:#f5ece1;
+  --muted:#ab9481;
+  --accent:#ff7a3d;
+  --accent-bright:#ffab73;
+  --accent-soft:rgba(255,122,61,0.16);
+  --gold:#e8b23d;
+  --gold-soft:rgba(232,178,61,0.17);
+  --danger:#ed8368;
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(620px 420px at 12% -8%, rgba(255,122,61,0.14), transparent 60%),
+    radial-gradient(560px 400px at 102% 4%, rgba(232,178,61,0.10), transparent 55%),
+    radial-gradient(900px 700px at 50% 120%, rgba(255,122,61,0.05), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;font-weight:600}
+.app{max-width:640px;margin:0 auto;padding:18px 16px calc(56px + env(safe-area-inset-bottom));padding-top:calc(18px + env(safe-area-inset-top))}
+
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.topbar .mark{width:42px;height:42px;flex:none;filter:drop-shadow(0 0 9px rgba(255,122,61,0.55)) drop-shadow(0 0 2px rgba(232,178,61,0.35))}
+.topbar h1{font-size:1.42rem;color:var(--accent);text-shadow:0 0 18px rgba(255,122,61,0.25)}
+.topbar p{margin:2px 0 0;font-size:0.8rem;color:var(--muted)}
+.topbar-back{background:none;border:none;color:var(--accent-bright);font-size:1.4rem;padding:4px 8px 4px 0;cursor:pointer;line-height:1}
+
+.view{display:none}
+.view.active{display:block}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:var(--radius);
+  box-shadow:0 2px 10px rgba(0,0,0,0.32);
+}
+
+.btn{
+  font-family:'Inter',sans-serif;font-weight:700;font-size:0.85rem;cursor:pointer;
+  border:1px solid var(--panel-border);border-radius:12px;padding:9px 14px;color:var(--ink);
+  background:var(--panel);transition:transform 0.05s ease, background 0.15s ease;
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:var(--accent);color:#231207;border-color:transparent;font-weight:800}
+.btn-ghost{background:transparent}
+.btn-danger{color:var(--danger);border-color:rgba(237,131,104,0.4)}
+.btn-block{width:100%;text-align:center}
+.btn-icon{width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:12px;flex:none}
+.btn-sm{padding:6px 10px;font-size:0.76rem}
+
+/* --- Recipe list --- */
+.recipe-card{padding:14px 16px;margin-bottom:10px;cursor:pointer}
+.recipe-card h3{font-size:1.08rem;color:var(--ink)}
+.recipe-card .meta{margin-top:4px;font-size:0.76rem;color:var(--muted)}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag-chip{font-size:0.7rem;color:var(--accent-bright);background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-weight:700}
+.empty-state{text-align:center;padding:48px 16px;color:var(--muted)}
+.empty-state .glyph{font-size:2.2rem;margin-bottom:10px;opacity:0.7}
+
+/* --- Cook view --- */
+.recipe-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
+.recipe-header h2{font-size:1.5rem;color:var(--ink)}
+.section-title{font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:700;margin:22px 0 10px}
+.section-title:first-of-type{margin-top:0}
+.ingredient-list{list-style:none;margin:0;padding:0}
+.ingredient-list li{display:flex;gap:8px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:0.95rem}
+.ingredient-list li:last-child{border-bottom:none}
+.ingredient-list .qty{color:var(--accent-bright);font-weight:700;flex:none;min-width:74px}
+.step-list{list-style:none;margin:0;padding:0;counter-reset:step}
+.step-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.step-item:last-child{border-bottom:none}
+.step-num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent-bright);font-weight:800;font-size:0.85rem;display:flex;align-items:center;justify-content:center}
+.step-body p{margin:0;font-size:0.95rem;line-height:1.45}
+.step-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.step-badge{font-size:0.7rem;color:var(--gold);background:var(--gold-soft);border-radius:8px;padding:2px 8px;font-weight:700}
+
+.fab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;background:var(--accent);color:#231207;border:none;box-shadow:0 6px 18px rgba(255,122,61,0.45);font-size:1.4rem;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:20}
+.fab:active{transform:scale(0.95)}
+.fab-new{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));}
+
+/* --- Form fields --- */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:0.76rem;color:var(--muted);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.03em}
+.field input,.field textarea{
+  width:100%;background:var(--bg-2);border:1px solid var(--panel-border);border-radius:11px;
+  padding:10px 12px;color:var(--ink);font-family:'Inter',sans-serif;font-size:0.92rem;
+}
+.field textarea{resize:vertical;min-height:64px}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+.row-2{display:flex;gap:8px}
+.row-2 .field{flex:1;margin-bottom:0}
+
+.dyn-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line-soft)}
+.dyn-row:last-child{border-bottom:none}
+.dyn-row .fields{flex:1;display:flex;flex-direction:column;gap:8px}
+.dyn-row .controls{display:flex;flex-direction:column;gap:4px;flex:none}
+.icon-btn{background:var(--bg-2);border:1px solid var(--panel-border);color:var(--muted);border-radius:8px;width:30px;height:28px;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.icon-btn:active{transform:scale(0.95)}
+.icon-btn.remove{color:var(--danger)}
+.add-row-btn{background:none;border:1px dashed var(--panel-border);color:var(--accent-bright);border-radius:11px;padding:9px;width:100%;font-weight:700;font-size:0.85rem;cursor:pointer;margin-top:2px}
+
+.seg{display:flex;border:1px solid var(--panel-border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.seg button{flex:1;padding:9px;border:none;background:var(--bg-2);color:var(--ink);font-family:'Inter',sans-serif;font-weight:700;font-size:0.85rem;cursor:pointer}
+.seg button:not(:last-child){border-right:1px solid var(--panel-border)}
+.seg button.active{background:var(--accent);color:#231207}
+.seg-panel{display:none}
+.seg-panel.active{display:block}
+
+.stars{display:flex;gap:4px}
+.star-btn{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--panel-border);line-height:1;padding:0}
+.star-btn.on{color:var(--gold)}
+
+.modal-actions{display:flex;gap:10px;margin-top:18px}
+.modal-actions .btn{flex:1;text-align:center}
+
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);
+  display:flex;align-items:flex-end;justify-content:center;z-index:50;opacity:0;pointer-events:none;transition:opacity 0.15s ease;
+}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{
+  width:100%;max-width:640px;max-height:92vh;
+  background:var(--panel);border:1px solid var(--panel-border);border-radius:20px 20px 0 0;
+  transform:translateY(16px);transition:transform 0.15s ease;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-scroll-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;padding:20px 18px 4px}
+.modal-actions-fixed{flex:none;padding:14px 18px calc(20px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft)}
+.modal h2{color:var(--accent-bright);font-size:1.1rem;margin-bottom:16px}
+
+.history-item{padding:12px 14px;margin-bottom:10px;cursor:pointer}
+.history-item .top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.history-item .date{font-size:0.82rem;font-weight:700}
+.history-badge{font-size:0.66rem;color:#231207;background:var(--gold);border-radius:999px;padding:2px 8px;font-weight:800}
+.history-item .note{font-size:0.84rem;color:var(--muted);margin-top:4px;line-height:1.4}
+.history-detail{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,140%);
+  background:#0a0807;color:var(--ink);padding:12px 16px;border-radius:12px;display:flex;align-items:center;gap:16px;
+  font-size:0.85rem;transition:transform 0.2s ease;z-index:80;box-shadow:0 8px 28px rgba(0,0,0,0.55);max-width:90vw;
+  border:1px solid var(--panel-border);
+}
+.toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar" id="topbar">
+    <svg class="mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <path d="M32 4c4 8-2 12-2 18 0 5 4 7 8 5-1 6-6 10-13 10-9 0-17-7-17-17C8 9 20 2 32 4z" fill="#ff7a3d"/>
+      <path d="M30 20c2 4-1 6-1 9 0 2.5 2 3.5 4 2.5-.5 3-3 5-6.5 5-4.5 0-8.5-3.5-8.5-8.5C18 21 24 18.5 30 20z" fill="#ffab73"/>
+    </svg>
+    <div>
+      <h1>Sutelagun</h1>
+      <p id="topbarSub">Errezetak</p>
+    </div>
+  </div>
+
+  <div class="view active" id="view-list">
+    <div id="recipeList"></div>
+  </div>
+
+  <div class="view" id="view-errezeta">
+    <button class="topbar-back" id="btnAtzera">&larr;</button>
+    <div class="recipe-header">
+      <h2 id="errezetaIzena"></h2>
+      <button class="btn btn-icon" id="btnEditatuIreki" title="Editatu">&#9998;</button>
+    </div>
+    <div class="tag-row" id="errezetaEtiketak"></div>
+
+    <div class="section-title">Osagaiak</div>
+    <ul class="ingredient-list" id="osagaiList"></ul>
+
+    <div class="section-title">Urratsak</div>
+    <ol class="step-list" id="urratsList" style="list-style:none;padding:0;margin:0"></ol>
+  </div>
+
+  <button class="fab fab-new" id="btnErrezetaBerria" title="Errezeta berria">+</button>
+
+  <!-- Edit / create modal -->
+  <div class="modal-overlay" id="modalEditatu">
+    <div class="modal">
+      <div class="modal-scroll-body">
+        <h2 id="modalEditatuTitulua">Errezeta berria</h2>
+
+        <div class="seg" id="editatuSeg" style="display:none">
+          <button class="seg-btn active" data-seg="editatu">Editatu</button>
+          <button class="seg-btn" data-seg="historia">Historia</button>
+        </div>
+
+        <div class="seg-panel active" id="segEditatu">
+          <div class="field">
+            <label>Izena</label>
+            <input type="text" id="inputIzena" placeholder="Adib. Amaren tarta">
+          </div>
+          <div class="field">
+            <label>Etiketak (komaz bereizita)</label>
+            <input type="text" id="inputEtiketak" placeholder="Adib. gozoa, oporrak">
+          </div>
+
+          <div class="section-title">Osagaiak</div>
+          <div id="osagaiRows"></div>
+          <button class="add-row-btn" id="btnGehituOsagaia">+ Osagaia gehitu</button>
+
+          <div class="section-title">Urratsak</div>
+          <div id="urratsRows"></div>
+          <button class="add-row-btn" id="btnGehituUrratsa">+ Urratsa gehitu</button>
+
+          <div class="section-title" id="oharraTitle">Aldaketaren oharra</div>
+          <div class="field" id="oharraField">
+            <label id="oharraLabel">Zer aldatu duzu eta zergatik?</label>
+            <textarea id="inputOharra" placeholder="Adib. 10 minutu gehiago labean, hobeto geratzen da"></textarea>
+          </div>
+          <div class="field">
+            <label>Balorazioa (aukerakoa)</label>
+            <div class="stars" id="starPicker">
+              <button type="button" class="star-btn" data-val="1">&#9733;</button>
+              <button type="button" class="star-btn" data-val="2">&#9733;</button>
+              <button type="button" class="star-btn" data-val="3">&#9733;</button>
+              <button type="button" class="star-btn" data-val="4">&#9733;</button>
+              <button type="button" class="star-btn" data-val="5">&#9733;</button>
+            </div>
+          </div>
+
+          <button class="btn btn-danger btn-block" id="btnEzabatuErrezeta" style="display:none;margin-top:8px">Ezabatu errezeta</button>
+        </div>
+
+        <div class="seg-panel" id="segHistoria">
+          <div id="historiaList"></div>
+        </div>
+      </div>
+      <div class="modal-actions-fixed">
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="btnEditatuUtzi">Utzi</button>
+          <button class="btn btn-primary" id="btnEditatuGorde">Gorde saiakera berri gisa</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><span id="toastMsg"></span><button id="toastClose">&times;</button></div>
+</div>
+
+<script>
+window.__SUTELAGUN_FIREBASE_CONFIG__ = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_IDf3"
+};
+</script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
+
+const firebaseConfig = window.__SUTELAGUN_FIREBASE_CONFIG__;
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const colRef = collection(db, "errezetak");
+
+let errezetak = [];
+let unekoErrezetaId = null;
+let editatuMode = null; // 'berria' | 'editatu'
+let editatuErrezetaId = null;
+let draft = null; // {izena, etiketak, osagaiak:[], urratsak:[], oharra, balorazioa}
+
+onSnapshot(colRef, (snap) => {
+  errezetak = [];
+  snap.forEach(d => errezetak.push({ id: d.id, ...d.data() }));
+  errezetak.sort((a,b) => (a.izena||'').localeCompare(b.izena||'', 'eu'));
+  renderList();
+  if (unekoErrezetaId) renderErrezetaView();
+});
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('btnErrezetaBerria').style.display = (id === 'view-list') ? 'flex' : 'none';
+}
+
+function findErrezeta(id){ return errezetak.find(e => e.id === id); }
+
+function renderList(){
+  const el = document.getElementById('recipeList');
+  if (errezetak.length === 0){
+    el.innerHTML = '<div class="empty-state"><div class="glyph">&#127859;</div>Ez dago errezetarik oraindik.<br>Sakatu + botoia lehen errezeta sortzeko.</div>';
+    return;
+  }
+  el.innerHTML = errezetak.map(e => {
+    const b = (e.bertsioak||[])[e.unekoa] || {};
+    const tags = (e.etiketak||[]).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('');
+    const bertsioKop = (e.bertsioak||[]).length;
+    return `<div class="panel recipe-card" data-id="${e.id}">
+      <h3>${escapeHtml(e.izena)}</h3>
+      <div class="meta">${(b.osagaiak||[]).length} osagai &middot; ${(b.urratsak||[]).length} urrats &middot; ${bertsioKop} saiakera</div>
+      ${tags ? `<div class="tag-row">${tags}</div>` : ''}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.recipe-card').forEach(card => {
+    card.addEventListener('click', () => {
+      unekoErrezetaId = card.dataset.id;
+      renderErrezetaView();
+      showView('view-errezeta');
+    });
+  });
+}
+
+function renderErrezetaView(){
+  const e = findErrezeta(unekoErrezetaId);
+  if (!e) { showView('view-list'); unekoErrezetaId = null; return; }
+  const b = (e.bertsioak||[])[e.unekoa] || {osagaiak:[],urratsak:[]};
+  document.getElementById('errezetaIzena').textContent = e.izena;
+  document.getElementById('errezetaEtiketak').innerHTML = (e.etiketak||[]).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('');
+  document.getElementById('osagaiList').innerHTML = (b.osagaiak||[]).map(o =>
+    `<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${escapeHtml(o.izena||'')}</span></li>`
+  ).join('') || '<li style="color:var(--muted)">Ez dago osagairik.</li>';
+  document.getElementById('urratsList').innerHTML = (b.urratsak||[]).map((u,i) => {
+    const badges = [];
+    if (u.denbora) badges.push(`<span class="step-badge">&#9200; ${escapeHtml(u.denbora)}</span>`);
+    if (u.teknika) badges.push(`<span class="step-badge">${escapeHtml(u.teknika)}</span>`);
+    return `<li class="step-item"><div class="step-num">${i+1}</div><div class="step-body"><p>${escapeHtml(u.jarraibidea||'')}</p>${badges.length ? `<div class="step-badges">${badges.join('')}</div>` : ''}</div></li>`;
+  }).join('') || '<li style="color:var(--muted)">Ez dago urratsik.</li>';
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('btnAtzera').addEventListener('click', () => {
+  unekoErrezetaId = null;
+  showView('view-list');
+});
+
+/* ---------- Edit / create modal ---------- */
+const modalEditatu = document.getElementById('modalEditatu');
+
+function openModalBerria(){
+  editatuMode = 'berria';
+  editatuErrezetaId = null;
+  draft = { izena:'', etiketak:[], osagaiak:[{izena:'',kopurua:'',unitatea:''}], urratsak:[{jarraibidea:'',denbora:'',teknika:''}], oharra:'', balorazioa:0 };
+  document.getElementById('modalEditatuTitulua').textContent = 'Errezeta berria';
+  document.getElementById('editatuSeg').style.display = 'none';
+  switchSeg('editatu');
+  document.getElementById('inputIzena').value = '';
+  document.getElementById('inputEtiketak').value = '';
+  document.getElementById('oharraTitle').style.display = 'none';
+  document.getElementById('oharraField').style.display = 'none';
+  document.getElementById('btnEzabatuErrezeta').style.display = 'none';
+  document.getElementById('btnEditatuGorde').textContent = 'Gorde errezeta';
+  setStars(0);
+  renderOsagaiRows();
+  renderUrratsRows();
+  modalEditatu.classList.add('open');
+}
+
+function openModalEditatu(){
+  const e = findErrezeta(unekoErrezetaId);
+  if (!e) return;
+  editatuMode = 'editatu';
+  editatuErrezetaId = e.id;
+  const b = (e.bertsioak||[])[e.unekoa] || {osagaiak:[],urratsak:[]};
+  draft = {
+    izena: e.izena,
+    etiketak: [...(e.etiketak||[])],
+    osagaiak: b.osagaiak && b.osagaiak.length ? b.osagaiak.map(o=>({...o})) : [{izena:'',kopurua:'',unitatea:''}],
+    urratsak: b.urratsak && b.urratsak.length ? b.urratsak.map(u=>({...u})) : [{jarraibidea:'',denbora:'',teknika:''}],
+    oharra:'', balorazioa:0
+  };
+  document.getElementById('modalEditatuTitulua').textContent = e.izena;
+  document.getElementById('editatuSeg').style.display = 'flex';
+  switchSeg('editatu');
+  document.getElementById('inputIzena').value = draft.izena;
+  document.getElementById('inputEtiketak').value = draft.etiketak.join(', ');
+  document.getElementById('oharraTitle').style.display = '';
+  document.getElementById('oharraField').style.display = '';
+  document.getElementById('btnEzabatuErrezeta').style.display = '';
+  document.getElementById('btnEditatuGorde').textContent = 'Gorde saiakera berri gisa';
+  setStars(0);
+  renderOsagaiRows();
+  renderUrratsRows();
+  renderHistoria();
+  modalEditatu.classList.add('open');
+}
+
+function closeModal(){ modalEditatu.classList.remove('open'); }
+
+function switchSeg(name){
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.seg === name));
+  document.getElementById('segEditatu').classList.toggle('active', name === 'editatu');
+  document.getElementById('segHistoria').classList.toggle('active', name === 'historia');
+}
+document.querySelectorAll('.seg-btn').forEach(b => b.addEventListener('click', () => switchSeg(b.dataset.seg)));
+
+function syncDraftFromDom(){
+  draft.izena = document.getElementById('inputIzena').value;
+  draft.etiketak = document.getElementById('inputEtiketak').value.split(',').map(s=>s.trim()).filter(Boolean);
+  document.querySelectorAll('#osagaiRows .dyn-row').forEach((row,i) => {
+    draft.osagaiak[i] = {
+      kopurua: row.querySelector('.f-kopurua').value,
+      unitatea: row.querySelector('.f-unitatea').value,
+      izena: row.querySelector('.f-osagai-izena').value
+    };
+  });
+  document.querySelectorAll('#urratsRows .dyn-row').forEach((row,i) => {
+    draft.urratsak[i] = {
+      jarraibidea: row.querySelector('.f-jarraibidea').value,
+      denbora: row.querySelector('.f-denbora').value,
+      teknika: row.querySelector('.f-teknika').value
+    };
+  });
+  draft.oharra = document.getElementById('inputOharra').value;
+}
+
+function renderOsagaiRows(){
+  const el = document.getElementById('osagaiRows');
+  el.innerHTML = draft.osagaiak.map((o,i) => `
+    <div class="dyn-row">
+      <div class="fields">
+        <div class="row-2">
+          <div class="field"><input class="f-kopurua" placeholder="Kopurua" value="${escapeHtml(o.kopurua||'')}"></div>
+          <div class="field"><input class="f-unitatea" placeholder="Unitatea" value="${escapeHtml(o.unitatea||'')}"></div>
+        </div>
+        <div class="field"><input class="f-osagai-izena" placeholder="Osagaiaren izena" value="${escapeHtml(o.izena||'')}"></div>
+      </div>
+      <div class="controls">
+        <button type="button" class="icon-btn remove" data-i="${i}" data-act="del-osagai">&times;</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('[data-act="del-osagai"]').forEach(btn => btn.addEventListener('click', () => {
+    syncDraftFromDom();
+    draft.osagaiak.splice(Number(btn.dataset.i),1);
+    if (draft.osagaiak.length === 0) draft.osagaiak.push({izena:'',kopurua:'',unitatea:''});
+    renderOsagaiRows();
+  }));
+}
+document.getElementById('btnGehituOsagaia').addEventListener('click', () => {
+  syncDraftFromDom();
+  draft.osagaiak.push({izena:'',kopurua:'',unitatea:''});
+  renderOsagaiRows();
+});
+
+function renderUrratsRows(){
+  const el = document.getElementById('urratsRows');
+  el.innerHTML = draft.urratsak.map((u,i) => `
+    <div class="dyn-row">
+      <div class="fields">
+        <div class="field"><textarea class="f-jarraibidea" placeholder="Jarraibidea">${escapeHtml(u.jarraibidea||'')}</textarea></div>
+        <div class="row-2">
+          <div class="field"><input class="f-denbora" placeholder="Denbora (aukerakoa)" value="${escapeHtml(u.denbora||'')}"></div>
+          <div class="field"><input class="f-teknika" placeholder="Teknika (aukerakoa)" value="${escapeHtml(u.teknika||'')}"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button type="button" class="icon-btn" data-i="${i}" data-act="up-urrats">&uarr;</button>
+        <button type="button" class="icon-btn" data-i="${i}" data-act="down-urrats">&darr;</button>
+        <button type="button" class="icon-btn remove" data-i="${i}" data-act="del-urrats">&times;</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('[data-act="del-urrats"]').forEach(btn => btn.addEventListener('click', () => {
+    syncDraftFromDom();
+    draft.urratsak.splice(Number(btn.dataset.i),1);
+    if (draft.urratsak.length === 0) draft.urratsak.push({jarraibidea:'',denbora:'',teknika:''});
+    renderUrratsRows();
+  }));
+  el.querySelectorAll('[data-act="up-urrats"]').forEach(btn => btn.addEventListener('click', () => {
+    syncDraftFromDom();
+    const i = Number(btn.dataset.i);
+    if (i > 0) { [draft.urratsak[i-1], draft.urratsak[i]] = [draft.urratsak[i], draft.urratsak[i-1]]; renderUrratsRows(); }
+  }));
+  el.querySelectorAll('[data-act="down-urrats"]').forEach(btn => btn.addEventListener('click', () => {
+    syncDraftFromDom();
+    const i = Number(btn.dataset.i);
+    if (i < draft.urratsak.length - 1) { [draft.urratsak[i+1], draft.urratsak[i]] = [draft.urratsak[i], draft.urratsak[i+1]]; renderUrratsRows(); }
+  }));
+}
+document.getElementById('btnGehituUrratsa').addEventListener('click', () => {
+  syncDraftFromDom();
+  draft.urratsak.push({jarraibidea:'',denbora:'',teknika:''});
+  renderUrratsRows();
+});
+
+function setStars(val){
+  draft.balorazioa = val;
+  document.querySelectorAll('.star-btn').forEach(b => b.classList.toggle('on', Number(b.dataset.val) <= val));
+}
+document.querySelectorAll('.star-btn').forEach(b => b.addEventListener('click', () => {
+  setStars(draft.balorazioa === Number(b.dataset.val) ? 0 : Number(b.dataset.val));
+}));
+
+function renderHistoria(){
+  const e = findErrezeta(editatuErrezetaId);
+  const el = document.getElementById('historiaList');
+  if (!e || !(e.bertsioak||[]).length){ el.innerHTML = '<p style="color:var(--muted)">Oraindik ez dago saiakerarik gordeta.</p>'; return; }
+  el.innerHTML = e.bertsioak.map((b,i) => {
+    const isUneko = i === e.unekoa;
+    const stars = b.balorazioa ? '&#9733;'.repeat(b.balorazioa) : '';
+    const data = new Date(b.noiz).toLocaleDateString('eu-ES', {day:'numeric', month:'short', year:'numeric'});
+    return `<div class="panel history-item" data-i="${i}">
+      <div class="top-row">
+        <span class="date">${data}</span>
+        ${isUneko ? '<span class="history-badge">Uneko bertsioa</span>' : ''}
+      </div>
+      ${stars ? `<div style="color:var(--gold);font-size:0.85rem">${stars}</div>` : ''}
+      ${b.oharra ? `<div class="note">${escapeHtml(b.oharra)}</div>` : ''}
+      <div class="history-detail" style="display:none">
+        <div class="section-title" style="margin-top:0">Osagaiak</div>
+        <ul class="ingredient-list">${(b.osagaiak||[]).map(o=>`<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${escapeHtml(o.izena||'')}</span></li>`).join('')}</ul>
+        <div class="section-title">Urratsak</div>
+        <ol class="step-list" style="list-style:none;padding:0;margin:0">${(b.urratsak||[]).map((u,si)=>`<li class="step-item"><div class="step-num">${si+1}</div><div class="step-body"><p>${escapeHtml(u.jarraibidea||'')}</p></div></li>`).join('')}</ol>
+        ${isUneko ? '' : `<button class="btn btn-primary btn-block" data-restore="${i}" style="margin-top:12px">Berreskuratu bertsio hau</button>`}
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.history-item').forEach(item => item.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-restore]')) return;
+    const detail = item.querySelector('.history-detail');
+    detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+  }));
+  el.querySelectorAll('[data-restore]').forEach(btn => btn.addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    const idx = Number(btn.dataset.restore);
+    const e = findErrezeta(editatuErrezetaId);
+    await setDoc(doc(db,'errezetak',e.id), { unekoa: idx }, { merge:true });
+    showToast('Bertsio zaharra berrezarri da.');
+    closeModal();
+  }));
+}
+
+document.getElementById('btnErrezetaBerria').addEventListener('click', openModalBerria);
+document.getElementById('btnEditatuIreki').addEventListener('click', openModalEditatu);
+document.getElementById('btnEditatuUtzi').addEventListener('click', closeModal);
+
+document.getElementById('btnEditatuGorde').addEventListener('click', async () => {
+  syncDraftFromDom();
+  if (!draft.izena.trim()){ showToast('Jarri errezetari izen bat.'); return; }
+  const osagaiak = draft.osagaiak.filter(o => o.izena && o.izena.trim());
+  const urratsak = draft.urratsak.filter(u => u.jarraibidea && u.jarraibidea.trim());
+  const bertsioaBerria = { noiz: new Date().toISOString(), oharra: draft.oharra.trim(), balorazioa: draft.balorazioa || null, osagaiak, urratsak };
+
+  if (editatuMode === 'berria'){
+    const ref = doc(colRef);
+    await setDoc(ref, { izena: draft.izena.trim(), etiketak: draft.etiketak, unekoa: 0, bertsioak: [bertsioaBerria], sortuta: new Date().toISOString() });
+    showToast('Errezeta gorde da.');
+  } else {
+    const e = findErrezeta(editatuErrezetaId);
+    const bertsioak = [...(e.bertsioak||[]), bertsioaBerria];
+    await setDoc(doc(db,'errezetak',e.id), { izena: draft.izena.trim(), etiketak: draft.etiketak, unekoa: bertsioak.length - 1, bertsioak }, { merge:true });
+    showToast('Saiakera berria gorde da.');
+  }
+  closeModal();
+});
+
+document.getElementById('btnEzabatuErrezeta').addEventListener('click', async () => {
+  if (!confirm('Ziur zaude errezeta hau ezabatu nahi duzula? Ezin da desegin.')) return;
+  await deleteDoc(doc(db,'errezetak',editatuErrezetaId));
+  closeModal();
+  unekoErrezetaId = null;
+  showView('view-list');
+  showToast('Errezeta ezabatu da.');
+});
+
+/* ---------- Toast ---------- */
+let toastTimer = null;
+function showToast(msg){
+  document.getElementById('toastMsg').textContent = msg;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+document.getElementById('toastClose').addEventListener('click', () => document.getElementById('toast').classList.remove('show'));
+</script>
+</body>
+</html>
