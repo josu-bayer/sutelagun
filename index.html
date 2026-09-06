@@ -83,6 +83,16 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
 .recipe-card .meta{margin-top:4px;font-size:0.76rem;color:var(--muted)}
 .tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .tag-chip{font-size:0.7rem;color:var(--accent-bright);background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-weight:700}
+.filter-row{display:flex;flex-wrap:wrap;gap:6px}
+.filter-chip{font-size:0.76rem;color:var(--accent-bright);background:var(--accent-soft);border:1px solid transparent;border-radius:999px;padding:5px 12px;font-weight:700;cursor:pointer}
+.filter-chip.active{background:var(--accent);color:#231207}
+.etiketa-chip{display:inline-flex;align-items:center;gap:6px;font-size:0.7rem;color:var(--accent-bright);background:var(--accent-soft);border-radius:999px;padding:3px 6px 3px 10px;font-weight:700}
+.etiketa-chip button{background:none;border:none;color:inherit;font-weight:800;cursor:pointer;padding:0 2px;line-height:1;font-size:0.9rem}
+.etiketa-input-wrap{position:relative}
+.etiketa-suggestions{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--panel-border);border-radius:11px;box-shadow:0 6px 18px rgba(0,0,0,0.4);z-index:10;max-height:180px;overflow-y:auto}
+.etiketa-suggestions .sugg-item{padding:9px 12px;font-size:0.88rem;cursor:pointer}
+.etiketa-suggestions .sugg-item:hover,.etiketa-suggestions .sugg-item:active{background:var(--accent-soft)}
+.field-hint{font-size:0.72rem;color:var(--muted);margin-top:4px}
 .empty-state{text-align:center;padding:48px 16px;color:var(--muted)}
 .empty-state .glyph{font-size:2.2rem;margin-bottom:10px;opacity:0.7}
 
@@ -193,6 +203,7 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
   </div>
 
   <div class="view active" id="view-list">
+    <div class="filter-row" id="etiketaFilterRow" style="margin-bottom:14px"></div>
     <div id="recipeList"></div>
   </div>
 
@@ -230,8 +241,13 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
             <input type="text" id="inputIzena" placeholder="Adib. Amaren tarta">
           </div>
           <div class="field">
-            <label>Etiketak (komaz bereizitte)</label>
-            <input type="text" id="inputEtiketak" placeholder="Adib. goxoa, oporrak">
+            <label>Etiketak</label>
+            <div class="tag-row" id="etiketaChips"></div>
+            <div class="etiketa-input-wrap">
+              <input type="text" id="etiketaInput" placeholder="Adib. goxoa" autocomplete="off">
+              <div class="etiketa-suggestions" id="etiketaSuggestions" style="display:none"></div>
+            </div>
+            <div class="field-hint">Sakatu Enter etiketa gehitzeko</div>
           </div>
 
           <div class="section-title">Osagaiek</div>
@@ -320,13 +336,39 @@ function showView(id){
 
 function findErrezeta(id){ return errezetak.find(e => e.id === id); }
 
+function allTags(){
+  const set = new Set();
+  errezetak.forEach(e => (e.etiketak||[]).forEach(t => set.add(t)));
+  return [...set].sort((a,b) => a.localeCompare(b,'eu'));
+}
+
+let etiketaFiltroa = null;
+
+function renderFilterRow(){
+  const el = document.getElementById('etiketaFilterRow');
+  const tags = allTags();
+  if (tags.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = tags.map(t => `<span class="filter-chip${etiketaFiltroa === t ? ' active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
+  el.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener('click', () => {
+    const t = chip.dataset.tag;
+    etiketaFiltroa = (etiketaFiltroa === t) ? null : t;
+    renderList();
+  }));
+}
+
 function renderList(){
+  renderFilterRow();
   const el = document.getElementById('recipeList');
   if (errezetak.length === 0){
     el.innerHTML = '<div class="empty-state"><div class="glyph">&#127859;</div>Oiñekarren ez dau errezetarik.<br>Sakatu + botoia lehen errezeta sortzeko.</div>';
     return;
   }
-  el.innerHTML = errezetak.map(e => {
+  const visible = etiketaFiltroa ? errezetak.filter(e => (e.etiketak||[]).includes(etiketaFiltroa)) : errezetak;
+  if (visible.length === 0){
+    el.innerHTML = '<div class="empty-state">Ez dau errezetarik etiketa honekin.</div>';
+    return;
+  }
+  el.innerHTML = visible.map(e => {
     const b = (e.bertsioak||[])[e.unekoa] || {};
     const tags = (e.etiketak||[]).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('');
     const bertsioKop = (e.bertsioak||[]).length;
@@ -402,12 +444,13 @@ function openModalBerria(){
   document.getElementById('editatuSeg').style.display = 'none';
   switchSeg('editatu');
   document.getElementById('inputIzena').value = '';
-  document.getElementById('inputEtiketak').value = '';
+  document.getElementById('etiketaInput').value = '';
   document.getElementById('oharraTitle').style.display = 'none';
   document.getElementById('oharraField').style.display = 'none';
   document.getElementById('btnEzabatuErrezeta').style.display = 'none';
   document.getElementById('btnEditatuGorde').textContent = 'Gorde errezeta';
   setStars(0);
+  renderEtiketaChips();
   renderOsagaiRows();
   renderUrratsRows();
   modalEditatu.classList.add('open');
@@ -430,12 +473,13 @@ function openModalEditatu(){
   document.getElementById('editatuSeg').style.display = 'flex';
   switchSeg('editatu');
   document.getElementById('inputIzena').value = draft.izena;
-  document.getElementById('inputEtiketak').value = draft.etiketak.join(', ');
+  document.getElementById('etiketaInput').value = '';
   document.getElementById('oharraTitle').style.display = '';
   document.getElementById('oharraField').style.display = '';
   document.getElementById('btnEzabatuErrezeta').style.display = '';
   document.getElementById('btnEditatuGorde').textContent = 'Gorde saiakera barrilez';
   setStars(0);
+  renderEtiketaChips();
   renderOsagaiRows();
   renderUrratsRows();
   renderHistoria();
@@ -451,9 +495,53 @@ function switchSeg(name){
 }
 document.querySelectorAll('.seg-btn').forEach(b => b.addEventListener('click', () => switchSeg(b.dataset.seg)));
 
+function renderEtiketaChips(){
+  const el = document.getElementById('etiketaChips');
+  el.innerHTML = draft.etiketak.map((t,i) => `<span class="etiketa-chip">${escapeHtml(t)}<button type="button" data-i="${i}">&times;</button></span>`).join('');
+  el.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+    draft.etiketak.splice(Number(btn.dataset.i),1);
+    renderEtiketaChips();
+  }));
+}
+
+function addEtiketa(val){
+  const v = val.trim();
+  if (!v || draft.etiketak.includes(v)) return;
+  draft.etiketak.push(v);
+  renderEtiketaChips();
+}
+
+const etiketaInput = document.getElementById('etiketaInput');
+const etiketaSuggestions = document.getElementById('etiketaSuggestions');
+
+function renderEtiketaSuggestions(){
+  const q = etiketaInput.value.trim().toLowerCase();
+  const matches = allTags().filter(t => !draft.etiketak.includes(t) && (!q || t.toLowerCase().includes(q))).slice(0,6);
+  if (matches.length === 0){ etiketaSuggestions.style.display = 'none'; return; }
+  etiketaSuggestions.innerHTML = matches.map(t => `<div class="sugg-item" data-t="${escapeHtml(t)}">${escapeHtml(t)}</div>`).join('');
+  etiketaSuggestions.style.display = 'block';
+  etiketaSuggestions.querySelectorAll('.sugg-item').forEach(item => item.addEventListener('mousedown', (ev) => {
+    ev.preventDefault();
+    addEtiketa(item.dataset.t);
+    etiketaInput.value = '';
+    etiketaSuggestions.style.display = 'none';
+  }));
+}
+
+etiketaInput.addEventListener('focus', renderEtiketaSuggestions);
+etiketaInput.addEventListener('input', renderEtiketaSuggestions);
+etiketaInput.addEventListener('blur', () => setTimeout(() => { etiketaSuggestions.style.display = 'none'; }, 150));
+etiketaInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' || ev.key === ','){
+    ev.preventDefault();
+    addEtiketa(etiketaInput.value.replace(/,$/,''));
+    etiketaInput.value = '';
+    etiketaSuggestions.style.display = 'none';
+  }
+});
+
 function syncDraftFromDom(){
   draft.izena = document.getElementById('inputIzena').value;
-  draft.etiketak = document.getElementById('inputEtiketak').value.split(',').map(s=>s.trim()).filter(Boolean);
   document.querySelectorAll('#osagaiRows .dyn-row').forEach((row,i) => {
     const erreferentzia = row.querySelector('.f-osagai-erreferentzia').value || null;
     const linked = erreferentzia ? findErrezeta(erreferentzia) : null;
