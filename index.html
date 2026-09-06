@@ -95,6 +95,9 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
 .ingredient-list li{display:flex;gap:8px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:0.95rem}
 .ingredient-list li:last-child{border-bottom:none}
 .ingredient-list .qty{color:var(--accent-bright);font-weight:700;flex:none;min-width:74px}
+.ingredient-link{color:var(--gold);font-weight:700;cursor:pointer;text-decoration:none;border-bottom:1px dashed var(--gold)}
+.ingredient-link:active{opacity:0.7}
+.ingredient-link::after{content:" \2197"}
 .step-list{list-style:none;margin:0;padding:0;counter-reset:step}
 .step-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
 .step-item:last-child{border-bottom:none}
@@ -110,12 +113,13 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
 /* --- Form fields --- */
 .field{margin-bottom:14px}
 .field label{display:block;font-size:0.76rem;color:var(--muted);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.03em}
-.field input,.field textarea{
+.field input,.field textarea,.field select{
   width:100%;background:var(--bg-2);border:1px solid var(--panel-border);border-radius:11px;
   padding:10px 12px;color:var(--ink);font-family:'Inter',sans-serif;font-size:0.92rem;
 }
 .field textarea{resize:vertical;min-height:64px}
-.field input:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+.field select{appearance:auto;color-scheme:dark}
+.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--accent)}
 .row-2{display:flex;gap:8px}
 .row-2 .field{flex:1;margin-bottom:0}
 
@@ -348,7 +352,7 @@ function renderErrezetaView(){
   document.getElementById('errezetaIzena').textContent = e.izena;
   document.getElementById('errezetaEtiketak').innerHTML = (e.etiketak||[]).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('');
   document.getElementById('osagaiList').innerHTML = (b.osagaiak||[]).map(o =>
-    `<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${escapeHtml(o.izena||'')}</span></li>`
+    `<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${osagaiDisplayHtml(o)}</span></li>`
   ).join('') || '<li style="color:var(--muted)">Ez dau osagairik.</li>';
   document.getElementById('urratsList').innerHTML = (b.urratsak||[]).map((u,i) => {
     const badges = [];
@@ -362,6 +366,26 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function osagaiDisplayHtml(o){
+  if (o.erreferentzia){
+    const linked = findErrezeta(o.erreferentzia);
+    if (linked) return `<span class="ingredient-link" data-link-id="${linked.id}">${escapeHtml(linked.izena)}</span>`;
+  }
+  return escapeHtml(o.izena||'');
+}
+
+document.body.addEventListener('click', (ev) => {
+  const link = ev.target.closest('.ingredient-link');
+  if (!link) return;
+  ev.stopPropagation();
+  const id = link.dataset.linkId;
+  if (!findErrezeta(id)) return;
+  closeModal();
+  unekoErrezetaId = id;
+  renderErrezetaView();
+  showView('view-errezeta');
+});
+
 document.getElementById('btnAtzera').addEventListener('click', () => {
   unekoErrezetaId = null;
   showView('view-list');
@@ -373,7 +397,7 @@ const modalEditatu = document.getElementById('modalEditatu');
 function openModalBerria(){
   editatuMode = 'berria';
   editatuErrezetaId = null;
-  draft = { izena:'', etiketak:[], osagaiak:[{izena:'',kopurua:'',unitatea:''}], urratsak:[{jarraibidea:'',denbora:'',teknika:''}], oharra:'', balorazioa:0 };
+  draft = { izena:'', etiketak:[], osagaiak:[{izena:'',kopurua:'',unitatea:'',erreferentzia:null}], urratsak:[{jarraibidea:'',denbora:'',teknika:''}], oharra:'', balorazioa:0 };
   document.getElementById('modalEditatuTitulua').textContent = 'Errezeta barria';
   document.getElementById('editatuSeg').style.display = 'none';
   switchSeg('editatu');
@@ -398,7 +422,7 @@ function openModalEditatu(){
   draft = {
     izena: e.izena,
     etiketak: [...(e.etiketak||[])],
-    osagaiak: b.osagaiak && b.osagaiak.length ? b.osagaiak.map(o=>({...o})) : [{izena:'',kopurua:'',unitatea:''}],
+    osagaiak: b.osagaiak && b.osagaiak.length ? b.osagaiak.map(o=>({...o})) : [{izena:'',kopurua:'',unitatea:'',erreferentzia:null}],
     urratsak: b.urratsak && b.urratsak.length ? b.urratsak.map(u=>({...u})) : [{jarraibidea:'',denbora:'',teknika:''}],
     oharra:'', balorazioa:0
   };
@@ -431,10 +455,13 @@ function syncDraftFromDom(){
   draft.izena = document.getElementById('inputIzena').value;
   draft.etiketak = document.getElementById('inputEtiketak').value.split(',').map(s=>s.trim()).filter(Boolean);
   document.querySelectorAll('#osagaiRows .dyn-row').forEach((row,i) => {
+    const erreferentzia = row.querySelector('.f-osagai-erreferentzia').value || null;
+    const linked = erreferentzia ? findErrezeta(erreferentzia) : null;
     draft.osagaiak[i] = {
       kopurua: row.querySelector('.f-kopurua').value,
       unitatea: row.querySelector('.f-unitatea').value,
-      izena: row.querySelector('.f-osagai-izena').value
+      izena: linked ? linked.izena : row.querySelector('.f-osagai-izena').value,
+      erreferentzia
     };
   });
   document.querySelectorAll('#urratsRows .dyn-row').forEach((row,i) => {
@@ -447,31 +474,52 @@ function syncDraftFromDom(){
   draft.oharra = document.getElementById('inputOharra').value;
 }
 
+function linkableErrezetak(){
+  return errezetak.filter(e => e.id !== editatuErrezetaId);
+}
+
 function renderOsagaiRows(){
   const el = document.getElementById('osagaiRows');
-  el.innerHTML = draft.osagaiak.map((o,i) => `
+  const linkables = linkableErrezetak();
+  el.innerHTML = draft.osagaiak.map((o,i) => {
+    const isLinked = !!o.erreferentzia;
+    const options = linkables.map(l => `<option value="${l.id}" ${o.erreferentzia === l.id ? 'selected' : ''}>${escapeHtml(l.izena)}</option>`).join('');
+    return `
     <div class="dyn-row">
       <div class="fields">
         <div class="row-2">
           <div class="field"><input class="f-kopurua" placeholder="Kopurue" value="${escapeHtml(o.kopurua||'')}"></div>
           <div class="field"><input class="f-unitatea" placeholder="Unitatie" value="${escapeHtml(o.unitatea||'')}"></div>
         </div>
-        <div class="field"><input class="f-osagai-izena" placeholder="Osagaiaren izena" value="${escapeHtml(o.izena||'')}"></div>
+        <div class="field">
+          <select class="f-osagai-erreferentzia">
+            <option value="">&mdash; Ez dau lotuta &mdash;</option>
+            ${options}
+          </select>
+        </div>
+        <div class="field f-osagai-izena-wrap" style="${isLinked ? 'display:none' : ''}">
+          <input class="f-osagai-izena" placeholder="Osagaiaren izena" value="${escapeHtml(o.izena||'')}">
+        </div>
       </div>
       <div class="controls">
         <button type="button" class="icon-btn remove" data-i="${i}" data-act="del-osagai">&times;</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   el.querySelectorAll('[data-act="del-osagai"]').forEach(btn => btn.addEventListener('click', () => {
     syncDraftFromDom();
     draft.osagaiak.splice(Number(btn.dataset.i),1);
-    if (draft.osagaiak.length === 0) draft.osagaiak.push({izena:'',kopurua:'',unitatea:''});
+    if (draft.osagaiak.length === 0) draft.osagaiak.push({izena:'',kopurua:'',unitatea:'',erreferentzia:null});
     renderOsagaiRows();
+  }));
+  el.querySelectorAll('.f-osagai-erreferentzia').forEach(sel => sel.addEventListener('change', () => {
+    const wrap = sel.closest('.dyn-row').querySelector('.f-osagai-izena-wrap');
+    wrap.style.display = sel.value ? 'none' : '';
   }));
 }
 document.getElementById('btnGehituOsagaia').addEventListener('click', () => {
   syncDraftFromDom();
-  draft.osagaiak.push({izena:'',kopurua:'',unitatea:''});
+  draft.osagaiak.push({izena:'',kopurua:'',unitatea:'',erreferentzia:null});
   renderOsagaiRows();
 });
 
@@ -540,7 +588,7 @@ function renderHistoria(){
       ${b.oharra ? `<div class="note">${escapeHtml(b.oharra)}</div>` : ''}
       <div class="history-detail" style="display:none">
         <div class="section-title" style="margin-top:0">Osagaiek</div>
-        <ul class="ingredient-list">${(b.osagaiak||[]).map(o=>`<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${escapeHtml(o.izena||'')}</span></li>`).join('')}</ul>
+        <ul class="ingredient-list">${(b.osagaiak||[]).map(o=>`<li><span class="qty">${escapeHtml(o.kopurua||'')} ${escapeHtml(o.unitatea||'')}</span><span>${osagaiDisplayHtml(o)}</span></li>`).join('')}</ul>
         <div class="section-title">Urratsek</div>
         <ol class="step-list" style="list-style:none;padding:0;margin:0">${(b.urratsak||[]).map((u,si)=>`<li class="step-item"><div class="step-num">${si+1}</div><div class="step-body"><p>${escapeHtml(u.jarraibidea||'')}</p></div></li>`).join('')}</ol>
         ${isUneko ? '' : `<button class="btn btn-primary btn-block" data-restore="${i}" style="margin-top:12px">Berreskuratu bertsiño hau</button>`}
