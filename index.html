@@ -29,6 +29,7 @@
   --gold:#e8b23d;
   --gold-soft:rgba(232,178,61,0.17);
   --danger:#ed8368;
+  --positive:#7ed99a;
   --radius:16px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -52,6 +53,14 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
 .topbar .mark{width:42px;height:42px;flex:none;filter:drop-shadow(0 0 9px rgba(255,122,61,0.55)) drop-shadow(0 0 2px rgba(232,178,61,0.35))}
 .topbar h1{font-size:1.42rem;color:var(--accent);text-shadow:0 0 18px rgba(255,122,61,0.25)}
 .topbar p{margin:2px 0 0;font-size:0.8rem;color:var(--muted)}
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:0.68rem;font-weight:700;color:var(--muted);margin-top:4px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+.sync-badge.synced{color:var(--positive)}
+.sync-badge.synced .sync-dot{background:var(--positive)}
+.sync-badge.syncing{color:var(--gold)}
+.sync-badge.syncing .sync-dot{background:var(--gold)}
+.sync-badge.offline{color:var(--danger)}
+.sync-badge.offline .sync-dot{background:var(--danger)}
 .topbar-back{background:none;border:none;color:var(--accent-bright);font-size:1.4rem;padding:4px 8px 4px 0;cursor:pointer;line-height:1}
 
 .view{display:none}
@@ -199,6 +208,7 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
     <div>
       <h1>Sutelagun</h1>
       <p id="topbarSub">Errezetak</p>
+      <p class="sync-badge" id="syncBadge"><span class="sync-dot"></span><span id="syncBadgeText"></span></p>
     </div>
   </div>
 
@@ -306,12 +316,15 @@ window.__SUTELAGUN_FIREBASE_CONFIG__ = {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, setDoc, deleteDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
 const firebaseConfig = window.__SUTELAGUN_FIREBASE_CONFIG__;
 const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp);
+const db = initializeFirestore(fbApp, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 const colRef = collection(db, "errezetak");
 
 let errezetak = [];
@@ -320,13 +333,36 @@ let editatuMode = null; // 'berria' | 'editatu'
 let editatuErrezetaId = null;
 let draft = null; // {izena, etiketak, osagaiak:[], urratsak:[], oharra, balorazioa}
 
-onSnapshot(colRef, (snap) => {
+let lastSnapshotHasPendingWrites = false;
+
+onSnapshot(colRef, { includeMetadataChanges: true }, (snap) => {
   errezetak = [];
   snap.forEach(d => errezetak.push({ id: d.id, ...d.data() }));
   errezetak.sort((a,b) => (a.izena||'').localeCompare(b.izena||'', 'eu'));
+  lastSnapshotHasPendingWrites = snap.metadata.hasPendingWrites;
+  updateSyncBadge();
   renderList();
   if (unekoErrezetaId) renderErrezetaView();
 });
+
+function updateSyncBadge(){
+  const badge = document.getElementById('syncBadge');
+  const text = document.getElementById('syncBadgeText');
+  if (!badge) return;
+  let state, label;
+  if (!navigator.onLine){
+    state = 'offline'; label = 'Konexiorik ez';
+  } else if (lastSnapshotHasPendingWrites){
+    state = 'syncing'; label = 'Aldaketak bidaltzen...';
+  } else {
+    state = 'synced'; label = 'Eguneratuta';
+  }
+  badge.className = 'sync-badge ' + state;
+  text.textContent = label;
+}
+window.addEventListener('online', updateSyncBadge);
+window.addEventListener('offline', updateSyncBadge);
+updateSyncBadge();
 
 function showView(id){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));

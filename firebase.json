@@ -6,7 +6,8 @@
       ".firebaserc",
       ".git/**",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "backups/**"
     ],
     "headers": [
       {
