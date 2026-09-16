@@ -210,6 +210,11 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
       <p id="topbarSub">Errezetak</p>
       <p class="sync-badge" id="syncBadge"><span class="sync-dot"></span><span id="syncBadgeText"></span></p>
     </div>
+    <button class="btn btn-small btn-ghost" id="btnRefresh" type="button" title="Eguneratzeak bilau" style="margin-left:auto">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36M21 4v6h-6"/>
+      </svg>
+    </button>
   </div>
 
   <div class="view active" id="view-list">
@@ -777,6 +782,20 @@ function showToast(msg){
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 document.getElementById('toastClose').addEventListener('click', () => document.getElementById('toast').classList.remove('show'));
+
+/* ---------- Service worker (offline app-shell) ---------- */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.error('Service worker erregistratzean errorea:', err));
+}
+document.getElementById('btnRefresh')?.addEventListener('click', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(reg => reg.update());
+    }).finally(() => window.location.reload());
+  } else {
+    window.location.reload();
+  }
+});
 </script>
 </body>
 </html>
