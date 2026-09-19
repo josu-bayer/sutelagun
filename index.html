@@ -223,6 +223,7 @@ h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;letter-spacing:0.005em;fo
 .meal-divider::before,.meal-divider::after{content:'';flex:1;height:1px;background:var(--panel-border)}
 .meal-divider span{padding:0 12px}
 .diet-slot-name[data-dish-id]{cursor:pointer}
+.hondar-badge{font-size:0.62rem;color:var(--gold);background:var(--gold-soft);border-radius:999px;padding:2px 8px;font-weight:800;display:inline-block;vertical-align:middle}
 .diet-extra .name[data-dish-id]{cursor:pointer}
 .diet-slot-check{color:var(--positive);font-weight:800;font-size:0.95rem}
 .diet-slot-name{font-size:1rem;font-weight:700;margin-bottom:2px}
@@ -1074,20 +1075,21 @@ function renderDieta(){
     slotak.innerHTML = '<div class="empty-state">Oiñekarren ez dau dietarik ezarritte.<br>Sakatu Ezarpenak hasteko.</div>';
   } else {
     const slotList = [
-      {slota:'gosaria', errezetaId: eguna.gosariaId},
-      {slota:'bazkaria', errezetaId: eguna.bazkariaId},
-      {slota:'afaria', errezetaId: eguna.afariaId},
-      {slota:'proteina', errezetaId: dietaEzarpenak.proteinaErrezetaId}
+      {slota:'gosaria', errezetaId: eguna.gosariaId, hondarra: !!eguna.gosariaHondarra},
+      {slota:'bazkaria', errezetaId: eguna.bazkariaId, hondarra: !!eguna.bazkariaHondarra},
+      {slota:'afaria', errezetaId: eguna.afariaId, hondarra: !!eguna.afariaHondarra},
+      {slota:'proteina', errezetaId: dietaEzarpenak.proteinaErrezetaId, hondarra: false}
     ];
     slotak.innerHTML = slotList.map(s => {
       const eginda = sarrerak.find(x => x.slota === s.slota);
       const planErrezeta = findErrezeta(s.errezetaId);
       const planB = planErrezeta ? (planErrezeta.bertsioak||[])[planErrezeta.unekoa] : null;
       const banatzailea = `<div class="meal-divider"><span>${SLOT_IZENAK[s.slota]}</span></div>`;
+      const hondarBadge = s.hondarra ? '<span class="hondar-badge">Hondarrak</span>' : '';
       if (eginda){
         const dishAttr = eginda.errezetaId ? ` data-dish-id="${eginda.errezetaId}"` : '';
         return banatzailea + `<div class="panel diet-slot done" data-slot="${s.slota}">
-          <div class="diet-slot-name"${dishAttr}><span class="diet-slot-check">&#10003;</span> ${escapeHtml(eginda.izena || eginda.izenAzkarra || '')}</div>
+          <div class="diet-slot-name"${dishAttr}><span class="diet-slot-check">&#10003;</span> ${escapeHtml(eginda.izena || eginda.izenAzkarra || '')} ${hondarBadge}</div>
           <div class="diet-slot-macros">${eginda.kaloriak ? eginda.kaloriak + ' kcal' : ''}${eginda.kaloriak && eginda.proteina ? ' &middot; ' : ''}${eginda.proteina ? eginda.proteina + 'g proteina' : ''}</div>
           <div class="diet-slot-actions"><button class="btn btn-sm btn-ghost" data-act="desegin" data-sarrera="${eginda.id}">Desegin</button></div>
         </div>`;
@@ -1099,7 +1101,8 @@ function renderDieta(){
         </div>`;
       }
       return banatzailea + `<div class="panel diet-slot" data-slot="${s.slota}">
-        <div class="diet-slot-name" data-dish-id="${s.errezetaId}">${escapeHtml(planErrezeta.izena)}</div>
+        <div class="diet-slot-name" data-dish-id="${s.errezetaId}">${escapeHtml(planErrezeta.izena)} ${hondarBadge}</div>
+        ${s.hondarra ? '<div class="field-hint" style="margin:-4px 0 6px">Ez dozu ezer prestau behar, atzoko hondarrak dira</div>' : ''}
         <div class="diet-slot-macros">${planB?.kaloriak ? planB.kaloriak + ' kcal' : ''}${planB?.kaloriak && planB?.proteina ? ' &middot; ' : ''}${planB?.proteina ? planB.proteina + 'g proteina' : ''}</div>
         <div class="diet-slot-actions">
           <button class="btn btn-sm btn-primary" data-act="egin" data-slota="${s.slota}" data-errezeta="${s.errezetaId}">Intte</button>
@@ -1265,11 +1268,17 @@ document.getElementById('btnDietaEzarpenakGorde').addEventListener('click', asyn
   const helburuKalorak = Number(document.getElementById('ezHelburuKalorak').value) || 0;
   const helburuProteina = Number(document.getElementById('ezHelburuProteina').value) || 0;
   const proteinaErrezetaId = document.getElementById('ezProteinaErrezeta').value || null;
-  const zikloEgunak = [...document.querySelectorAll('#ezZikloEgunak .ziklo-egun-card')].map((card, i) => ({
-    gosariaId: card.querySelector('.ez-gosaria').value || null,
-    bazkariaId: card.querySelector('.ez-bazkaria').value || null,
-    afariaId: card.querySelector('.ez-afaria').value || null
-  }));
+  const zikloEgunak = [...document.querySelectorAll('#ezZikloEgunak .ziklo-egun-card')].map((card, i) => {
+    const aurrekoa = dietaEzarpenak?.zikloEgunak?.[i] || {};
+    return {
+      gosariaId: card.querySelector('.ez-gosaria').value || null,
+      bazkariaId: card.querySelector('.ez-bazkaria').value || null,
+      afariaId: card.querySelector('.ez-afaria').value || null,
+      ...(aurrekoa.gosariaHondarra ? {gosariaHondarra:true} : {}),
+      ...(aurrekoa.bazkariaHondarra ? {bazkariaHondarra:true} : {}),
+      ...(aurrekoa.afariaHondarra ? {afariaHondarra:true} : {})
+    };
+  });
   await setDoc(ezarpenakRef, {
     helburuKalorak, helburuProteina, proteinaErrezetaId, zikloEgunak,
     zikloHasieraData: modalDietaEzarpenak.dataset.zikloHasieraData
