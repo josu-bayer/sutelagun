@@ -481,7 +481,7 @@ window.__SUTELAGUN_FIREBASE_CONFIG__ = {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, setDoc, deleteDoc, onSnapshot, arrayUnion
+  collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, arrayUnion, getDocs
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
 const firebaseConfig = window.__SUTELAGUN_FIREBASE_CONFIG__;
@@ -490,6 +490,61 @@ const db = initializeFirestore(fbApp, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
 const colRef = collection(db, "errezetak");
+
+/* ---------- Zerrenda bridge: Etxeko Stoka (Home Stock) ---------- */
+const ZERRENDA_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID95"
+};
+const zerrendaApp = initializeApp(ZERRENDA_CONFIG, 'zerrenda');
+const zerrendaDb = initializeFirestore(zerrendaApp, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+const stokaCol = collection(zerrendaDb, 'etxeStoka');
+let etxeStoka = [];
+onSnapshot(stokaCol, (snap) => {
+  etxeStoka = [];
+  snap.forEach(d => etxeStoka.push({ id: d.id, ...d.data() }));
+});
+
+async function stokaAldatu(izena, unitatea, aldea){
+  // aldea: negative to consume (cook), positive to restore (undo)
+  const bat = etxeStoka.find(s => s.izena.toLowerCase() === izena.toLowerCase() && (s.unitatea||null) === (unitatea||null));
+  if (!bat || bat.kopurua == null) return; // not tracked numerically, nothing to adjust
+  await updateDoc(doc(zerrendaDb, 'etxeStoka', bat.id), { kopurua: Math.max(0, bat.kopurua + aldea) });
+}
+
+function ebatziOsagaiakSuteko(errezetaId, ikusitakoak){
+  if (!errezetaId || ikusitakoak.has(errezetaId)) return [];
+  ikusitakoak.add(errezetaId);
+  const errezeta = findErrezeta(errezetaId);
+  if (!errezeta) return [];
+  const bertsioa = (errezeta.bertsioak||[])[errezeta.unekoa] || {};
+  let emaitza = [];
+  for (const o of (bertsioa.osagaiak || [])) {
+    if (o.erreferentzia) {
+      emaitza = emaitza.concat(ebatziOsagaiakSuteko(o.erreferentzia, ikusitakoak));
+    } else if (o.izena) {
+      const kop = parseFloat(o.kopurua);
+      emaitza.push({ izena: o.izena, kopurua: isNaN(kop) ? null : kop, unitatea: (o.unitatea||'').trim() });
+    }
+  }
+  return emaitza;
+}
+
+async function stokaErabiliErrezetagatik(errezetaId, hondarraSaila, norabidea){
+  // norabidea: -1 to consume (meal cooked), +1 to restore (undo)
+  const osagaiak = ebatziOsagaiakSuteko(errezetaId, new Set());
+  for (const o of osagaiak) {
+    if (o.kopurua == null) continue;
+    if (hondarraSaila && o.izena === hondarraSaila) continue; // shared side already accounted for elsewhere
+    await stokaAldatu(o.izena, o.unitatea, norabidea * o.kopurua);
+  }
+}
 
 let errezetak = [];
 let unekoErrezetaId = null;
@@ -1053,8 +1108,9 @@ async function errezetaGehituEgunerokora(errezetaId){
   if (!e) return;
   const b = (e.bertsioak||[])[e.unekoa] || {};
   const gaur = dataStr(new Date());
-  const sarrera = { id: uuid(), slota:'aparte', jatorria:'aparte', errezetaId, izena: e.izena, kaloriak: b.kaloriak ?? null, proteina: b.proteina ?? null, razioak:1, noiz: new Date().toISOString() };
+  const sarrera = { id: uuid(), slota:'aparte', jatorria:'aparte', errezetaId, izena: e.izena, kaloriak: b.kaloriak ?? null, proteina: b.proteina ?? null, razioak:1, hondarraSaila:null, noiz: new Date().toISOString() };
   await gehituSarrera(gaur, sarrera);
+  stokaErabiliErrezetagatik(errezetaId, null, -1).catch(err => console.error('Stoka eguneratzean errorea:', err));
   showToast('Gaurko egunerokoan sartu da.');
 }
 
@@ -1105,7 +1161,7 @@ function renderDieta(){
         ${(typeof s.hondarra === 'string') ? `<div class="field-hint" style="margin:-4px 0 6px">${escapeHtml(s.hondarra)} jada eginda dago, ez dozu barritik egin behar</div>` : ''}
         <div class="diet-slot-macros">${planB?.kaloriak ? planB.kaloriak + ' kcal' : ''}${planB?.kaloriak && planB?.proteina ? ' &middot; ' : ''}${planB?.proteina ? planB.proteina + 'g proteina' : ''}</div>
         <div class="diet-slot-actions">
-          <button class="btn btn-sm btn-primary" data-act="egin" data-slota="${s.slota}" data-errezeta="${s.errezetaId}">Intte</button>
+          <button class="btn btn-sm btn-primary" data-act="egin" data-slota="${s.slota}" data-errezeta="${s.errezetaId}" data-hondarra="${escapeHtml((typeof s.hondarra === 'string') ? s.hondarra : '')}">Intte</button>
           <button class="btn btn-sm btn-ghost" data-act="ordeztu" data-slota="${s.slota}">Ordeztu</button>
         </div>
       </div>`;
@@ -1115,11 +1171,16 @@ function renderDieta(){
   slotak.querySelectorAll('[data-act="egin"]').forEach(btn => btn.addEventListener('click', async () => {
     const errezeta = findErrezeta(btn.dataset.errezeta);
     const b = errezeta ? (errezeta.bertsioak||[])[errezeta.unekoa] : null;
-    const sarrera = { id: uuid(), slota: btn.dataset.slota, jatorria:'plana', errezetaId: btn.dataset.errezeta, izena: errezeta?.izena||'', kaloriak: b?.kaloriak ?? null, proteina: b?.proteina ?? null, razioak:1, noiz: new Date().toISOString() };
+    const hondarraSaila = btn.dataset.hondarra || null;
+    const sarrera = { id: uuid(), slota: btn.dataset.slota, jatorria:'plana', errezetaId: btn.dataset.errezeta, izena: errezeta?.izena||'', kaloriak: b?.kaloriak ?? null, proteina: b?.proteina ?? null, razioak:1, hondarraSaila, noiz: new Date().toISOString() };
     await gehituSarrera(dietaUnekoData, sarrera);
+    if (errezeta) stokaErabiliErrezetagatik(errezeta.id, hondarraSaila, -1).catch(err => console.error('Stoka eguneratzean errorea:', err));
   }));
   slotak.querySelectorAll('[data-act="desegin"]').forEach(btn => btn.addEventListener('click', async () => {
+    const sarrerak = (egunerokoaCache[dietaUnekoData]?.sarrerak) || [];
+    const sarrera = sarrerak.find(s => s.id === btn.dataset.sarrera);
     await kenduSarrera(dietaUnekoData, btn.dataset.sarrera);
+    if (sarrera && sarrera.errezetaId) stokaErabiliErrezetagatik(sarrera.errezetaId, sarrera.hondarraSaila || null, +1).catch(err => console.error('Stoka eguneratzean errorea:', err));
   }));
   slotak.querySelectorAll('[data-act="ordeztu"]').forEach(btn => btn.addEventListener('click', () => openModalOrdeztu(btn.dataset.slota)));
   slotak.querySelectorAll('[data-dish-id]').forEach(el => el.addEventListener('click', () => irekiErrezetaBista(el.dataset.dishId)));
@@ -1136,7 +1197,9 @@ function renderDieta(){
       <button data-sarrera="${a.id}">&times;</button>
     </div>`).join('');
     aparteakEl.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async () => {
+      const sarrera = aparteak.find(a => a.id === btn.dataset.sarrera);
       await kenduSarrera(dietaUnekoData, btn.dataset.sarrera);
+      if (sarrera && sarrera.errezetaId) stokaErabiliErrezetagatik(sarrera.errezetaId, sarrera.hondarraSaila || null, +1).catch(err => console.error('Stoka eguneratzean errorea:', err));
     }));
     aparteakEl.querySelectorAll('[data-dish-id]').forEach(el => el.addEventListener('click', () => irekiErrezetaBista(el.dataset.dishId)));
   }
@@ -1189,8 +1252,9 @@ document.getElementById('ordeztuBilaketa').addEventListener('input', (ev) => {
   box.querySelectorAll('.search-result[data-id]').forEach(item => item.addEventListener('click', async () => {
     const e = findErrezeta(item.dataset.id);
     const b = (e.bertsioak||[])[e.unekoa] || {};
-    const sarrera = { id: uuid(), slota: ordeztuSlota, jatorria:'ordezkoa', errezetaId: e.id, izena: e.izena, kaloriak: b.kaloriak ?? null, proteina: b.proteina ?? null, razioak:1, noiz: new Date().toISOString() };
+    const sarrera = { id: uuid(), slota: ordeztuSlota, jatorria:'ordezkoa', errezetaId: e.id, izena: e.izena, kaloriak: b.kaloriak ?? null, proteina: b.proteina ?? null, razioak:1, hondarraSaila:null, noiz: new Date().toISOString() };
     await gehituSarrera(dietaUnekoData, sarrera);
+    stokaErabiliErrezetagatik(e.id, null, -1).catch(err => console.error('Stoka eguneratzean errorea:', err));
     modalOrdeztu.classList.remove('open');
     showToast('Otordua ordeztu da.');
   }));
