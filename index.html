@@ -1075,9 +1075,9 @@ function renderDieta(){
     slotak.innerHTML = '<div class="empty-state">Oiñekarren ez dau dietarik ezarritte.<br>Sakatu Ezarpenak hasteko.</div>';
   } else {
     const slotList = [
-      {slota:'gosaria', errezetaId: eguna.gosariaId, hondarra: !!eguna.gosariaHondarra},
-      {slota:'bazkaria', errezetaId: eguna.bazkariaId, hondarra: !!eguna.bazkariaHondarra},
-      {slota:'afaria', errezetaId: eguna.afariaId, hondarra: !!eguna.afariaHondarra},
+      {slota:'gosaria', errezetaId: eguna.gosariaId, hondarra: eguna.gosariaHondarra || false},
+      {slota:'bazkaria', errezetaId: eguna.bazkariaId, hondarra: eguna.bazkariaHondarra || false},
+      {slota:'afaria', errezetaId: eguna.afariaId, hondarra: eguna.afariaHondarra || false},
       {slota:'proteina', errezetaId: dietaEzarpenak.proteinaErrezetaId, hondarra: false}
     ];
     slotak.innerHTML = slotList.map(s => {
@@ -1102,7 +1102,7 @@ function renderDieta(){
       }
       return banatzailea + `<div class="panel diet-slot" data-slot="${s.slota}">
         <div class="diet-slot-name" data-dish-id="${s.errezetaId}">${escapeHtml(planErrezeta.izena)} ${hondarBadge}</div>
-        ${s.hondarra ? '<div class="field-hint" style="margin:-4px 0 6px">Ez dozu ezer prestau behar, atzoko hondarrak dira</div>' : ''}
+        ${(typeof s.hondarra === 'string') ? `<div class="field-hint" style="margin:-4px 0 6px">${escapeHtml(s.hondarra)} jada eginda dago, ez dozu barritik egin behar</div>` : ''}
         <div class="diet-slot-macros">${planB?.kaloriak ? planB.kaloriak + ' kcal' : ''}${planB?.kaloriak && planB?.proteina ? ' &middot; ' : ''}${planB?.proteina ? planB.proteina + 'g proteina' : ''}</div>
         <div class="diet-slot-actions">
           <button class="btn btn-sm btn-primary" data-act="egin" data-slota="${s.slota}" data-errezeta="${s.errezetaId}">Intte</button>
@@ -1274,9 +1274,9 @@ document.getElementById('btnDietaEzarpenakGorde').addEventListener('click', asyn
       gosariaId: card.querySelector('.ez-gosaria').value || null,
       bazkariaId: card.querySelector('.ez-bazkaria').value || null,
       afariaId: card.querySelector('.ez-afaria').value || null,
-      ...(aurrekoa.gosariaHondarra ? {gosariaHondarra:true} : {}),
-      ...(aurrekoa.bazkariaHondarra ? {bazkariaHondarra:true} : {}),
-      ...(aurrekoa.afariaHondarra ? {afariaHondarra:true} : {})
+      ...(aurrekoa.gosariaHondarra ? {gosariaHondarra: aurrekoa.gosariaHondarra} : {}),
+      ...(aurrekoa.bazkariaHondarra ? {bazkariaHondarra: aurrekoa.bazkariaHondarra} : {}),
+      ...(aurrekoa.afariaHondarra ? {afariaHondarra: aurrekoa.afariaHondarra} : {})
     };
   });
   await setDoc(ezarpenakRef, {
