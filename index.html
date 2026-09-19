@@ -607,6 +607,16 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+const EGUN_IZENAK = ['domeka','astelena','martitzena','eguztena','eguena','barikue','zapatue'];
+const HILABETE_IZENAK = ['Urtarrile','Zezeile','Martie','Aprile','Maiatze','Bagile','Garagarrile','Agustue','Iraile','Urrie','Zemendie','Abendue'];
+
+function formatDataOsoa(date){
+  return `${EGUN_IZENAK[date.getDay()]}, ${date.getDate()} ${HILABETE_IZENAK[date.getMonth()]}`;
+}
+function formatDataLabur(date){
+  return `${date.getDate()} ${HILABETE_IZENAK[date.getMonth()]} ${date.getFullYear()}`;
+}
+
 function osagaiDisplayHtml(o){
   if (o.erreferentzia){
     const linked = findErrezeta(o.erreferentzia);
@@ -873,7 +883,7 @@ function renderHistoria(){
   el.innerHTML = e.bertsioak.map((b,i) => {
     const isUneko = i === e.unekoa;
     const stars = b.balorazioa ? '&#9733;'.repeat(b.balorazioa) : '';
-    const data = new Date(b.noiz).toLocaleDateString('eu-ES', {day:'numeric', month:'short', year:'numeric'});
+    const data = formatDataLabur(new Date(b.noiz));
     return `<div class="panel history-item" data-i="${i}">
       <div class="top-row">
         <span class="date">${data}</span>
@@ -998,7 +1008,7 @@ const SLOT_IZENAK = { gosaria:'Armosue', bazkaria:'Bezkarie', afaria:'Afarie', p
 function renderDieta(){
   const dEl = document.getElementById('dietaData');
   const gaur = dataStr(new Date());
-  const dLabel = new Date(dietaUnekoData + 'T00:00:00').toLocaleDateString('eu-ES', {weekday:'short', day:'numeric', month:'short'});
+  const dLabel = formatDataOsoa(new Date(dietaUnekoData + 'T00:00:00'));
   dEl.textContent = (dietaUnekoData === gaur ? 'Gaur — ' : '') + dLabel;
 
   const idx = zikloEgunaIndexea(dietaUnekoData);
