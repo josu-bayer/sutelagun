@@ -506,16 +506,33 @@ const zerrendaDb = initializeFirestore(zerrendaApp, {
 });
 const stokaCol = collection(zerrendaDb, 'etxeStoka');
 let etxeStoka = [];
+let etxeStokaLehenSnapshotaIritsi;
+const etxeStokaPrest = new Promise(res => { etxeStokaLehenSnapshotaIritsi = res; });
 onSnapshot(stokaCol, (snap) => {
   etxeStoka = [];
   snap.forEach(d => etxeStoka.push({ id: d.id, ...d.data() }));
+  etxeStokaLehenSnapshotaIritsi();
 });
 
 async function stokaAldatu(izena, unitatea, aldea){
   // aldea: negative to consume (cook), positive to restore (undo)
+  await etxeStokaPrest; // never read etxeStoka before its first real snapshot has arrived
   const bat = etxeStoka.find(s => s.izena.toLowerCase() === izena.toLowerCase() && (s.unitatea||null) === (unitatea||null));
-  if (!bat || bat.kopurua == null) return; // not tracked numerically, nothing to adjust
-  await updateDoc(doc(zerrendaDb, 'etxeStoka', bat.id), { kopurua: Math.max(0, bat.kopurua + aldea) });
+  if (bat) {
+    if (bat.kopurua == null) return; // not tracked numerically, nothing to adjust
+    const berria = bat.kopurua + aldea;
+    if (berria <= 0) {
+      // Fully used up - remove it from Etxeko Stoka rather than leaving a "0" row
+      await deleteDoc(doc(zerrendaDb, 'etxeStoka', bat.id));
+    } else {
+      await updateDoc(doc(zerrendaDb, 'etxeStoka', bat.id), { kopurua: berria });
+    }
+    return;
+  }
+  // No existing entry: this ingredient isn't tracked in Etxeko Stoka.
+  // Undo must not invent a new entry here - we can't tell "was tracked and
+  // got deleted at zero" apart from "was never tracked at all", and most
+  // recipe ingredients fall in the latter (far more common) case.
 }
 
 function ebatziOsagaiakSuteko(errezetaId, ikusitakoak){
@@ -1095,6 +1112,71 @@ function zikloEgunaIndexea(dStr){
   return ((egunKop % n) + n) % n;
 }
 
+const ZIKLO_SLOTAK = ['gosaria', 'bazkaria', 'afaria'];
+
+// A slot only moves to the next cycle day once you mark it done - it doesn't
+// auto-advance with the calendar, so a skipped/delayed meal stays "owed" until done.
+function egunAurrerapenKop(dStr){
+  const gaur = dataStr(new Date());
+  return Math.round((new Date(dStr + 'T00:00:00') - new Date(gaur + 'T00:00:00')) / 86400000);
+}
+
+// A cycle day can carry "<slota>Varianteak" (an array of recipe ids) instead of/alongside a
+// single "<slota>Id" - when present, which one actually shows depends on how many full trips
+// through the cycle that slot has completed (aurrerapenaBiraka), so two dishes can trade off
+// on the same day-slot every other lap without ever changing how often that slot itself occurs.
+function ebatziSlotErrezetaId(slota, eguna, efektiboaBiraka){
+  const varianteak = eguna[slota + 'Varianteak'];
+  if (Array.isArray(varianteak) && varianteak.length){
+    const i = ((efektiboaBiraka % varianteak.length) + varianteak.length) % varianteak.length;
+    return varianteak[i];
+  }
+  return eguna[slota + 'Id'] ?? null;
+}
+
+// Returns { idx, eguna, errezetaId } for a given plan slot on the currently viewed date.
+// Today/past dates show the slot's real pending position (the cursor); future
+// dates show a projected preview assuming completion stays on pace from here.
+function slotZikloEguna(slota, dStr){
+  if (!dietaEzarpenak || !dietaEzarpenak.zikloEgunak || !dietaEzarpenak.zikloEgunak.length) return null;
+  const n = dietaEzarpenak.zikloEgunak.length;
+  const aurrerapena = dietaEzarpenak.aurrerapena;
+  let idx, efektiboaBiraka;
+  if (aurrerapena && aurrerapena[slota] != null){
+    const aurreratzea = egunAurrerapenKop(dStr);
+    const rawIdx = aurreratzea > 0 ? aurrerapena[slota] + aurreratzea : aurrerapena[slota];
+    const lapOffset = aurreratzea > 0 ? Math.floor(rawIdx / n) : 0;
+    const biraka = dietaEzarpenak.aurrerapenaBiraka;
+    efektiboaBiraka = (biraka && biraka[slota] != null ? biraka[slota] : 0) + lapOffset;
+    idx = ((rawIdx % n) + n) % n;
+  } else {
+    idx = zikloEgunaIndexea(dStr); // fallback for a plan that predates this field
+    efektiboaBiraka = 0;
+    if (idx == null) return null;
+  }
+  const eguna = dietaEzarpenak.zikloEgunak[idx];
+  return { idx, eguna, errezetaId: ebatziSlotErrezetaId(slota, eguna, efektiboaBiraka) };
+}
+
+async function aurreratuZikloa(slota, norabidea){
+  if (!ZIKLO_SLOTAK.includes(slota) || !dietaEzarpenak || !dietaEzarpenak.zikloEgunak?.length) return;
+  const n = dietaEzarpenak.zikloEgunak.length;
+  const gaurIdx = zikloEgunaIndexea(dataStr(new Date())) || 0;
+  const oraingoak = dietaEzarpenak.aurrerapena || { gosaria: gaurIdx, bazkaria: gaurIdx, afaria: gaurIdx };
+  const oraingoa = oraingoak[slota] != null ? oraingoak[slota] : gaurIdx;
+  const berria = ((oraingoa + norabidea) % n + n) % n;
+
+  const birakaOraingoak = dietaEzarpenak.aurrerapenaBiraka || { gosaria: 0, bazkaria: 0, afaria: 0 };
+  let birakaBerria = birakaOraingoak[slota] != null ? birakaOraingoak[slota] : 0;
+  if (norabidea > 0 && berria < oraingoa) birakaBerria += 1; // wrapped forward past the end of the cycle - one more lap done
+  if (norabidea < 0 && berria > oraingoa) birakaBerria -= 1; // undone back past the start - one less lap done
+
+  await setDoc(ezarpenakRef, {
+    aurrerapena: { ...oraingoak, [slota]: berria },
+    aurrerapenaBiraka: { ...birakaOraingoak, [slota]: birakaBerria }
+  }, { merge: true });
+}
+
 async function gehituSarrera(dStr, sarrera){
   await setDoc(doc(db, 'egunerokoa', dStr), { sarrerak: arrayUnion(sarrera) }, { merge: true });
 }
@@ -1122,18 +1204,20 @@ function renderDieta(){
   const dLabel = formatDataOsoa(new Date(dietaUnekoData + 'T00:00:00'));
   dEl.textContent = (dietaUnekoData === gaur ? 'Gaur — ' : '') + dLabel;
 
-  const idx = zikloEgunaIndexea(dietaUnekoData);
-  const eguna = (idx !== null && dietaEzarpenak) ? dietaEzarpenak.zikloEgunak[idx] : null;
   const sarrerak = (egunerokoaCache[dietaUnekoData]?.sarrerak) || [];
+  const geroagokoa = egunAurrerapenKop(dietaUnekoData) > 0; // viewing a future, not-yet-reached day
 
   const slotak = document.getElementById('dietaSlotak');
-  if (!dietaEzarpenak || !eguna){
+  const gosariaS = slotZikloEguna('gosaria', dietaUnekoData);
+  if (!dietaEzarpenak || !gosariaS){
     slotak.innerHTML = '<div class="empty-state">Oiñekarren ez dau dietarik ezarritte.<br>Sakatu Ezarpenak hasteko.</div>';
   } else {
+    const bazkariaS = slotZikloEguna('bazkaria', dietaUnekoData);
+    const afariaS = slotZikloEguna('afaria', dietaUnekoData);
     const slotList = [
-      {slota:'gosaria', errezetaId: eguna.gosariaId, hondarra: eguna.gosariaHondarra || false},
-      {slota:'bazkaria', errezetaId: eguna.bazkariaId, hondarra: eguna.bazkariaHondarra || false},
-      {slota:'afaria', errezetaId: eguna.afariaId, hondarra: eguna.afariaHondarra || false},
+      {slota:'gosaria', errezetaId: gosariaS?.errezetaId ?? null, hondarra: gosariaS?.eguna?.gosariaHondarra || false},
+      {slota:'bazkaria', errezetaId: bazkariaS?.errezetaId ?? null, hondarra: bazkariaS?.eguna?.bazkariaHondarra || false},
+      {slota:'afaria', errezetaId: afariaS?.errezetaId ?? null, hondarra: afariaS?.eguna?.afariaHondarra || false},
       {slota:'proteina', errezetaId: dietaEzarpenak.proteinaErrezetaId, hondarra: false}
     ];
     slotak.innerHTML = slotList.map(s => {
@@ -1150,10 +1234,18 @@ function renderDieta(){
           <div class="diet-slot-actions"><button class="btn btn-sm btn-ghost" data-act="desegin" data-sarrera="${eginda.id}">Desegin</button></div>
         </div>`;
       }
+      const aurreikuspenBadge = geroagokoa ? '<span class="hondar-badge" style="background:var(--muted)">Aurreikuspena</span>' : '';
       if (!planErrezeta){
+        if (geroagokoa) return banatzailea + `<div class="panel diet-slot" data-slot="${s.slota}"><div class="diet-slot-name" style="color:var(--muted)">Ez dago errezetarik esleituta ${aurreikuspenBadge}</div></div>`;
         return banatzailea + `<div class="panel diet-slot" data-slot="${s.slota}">
           <div class="diet-slot-name" style="color:var(--muted)">Ez dago errezetarik esleituta</div>
           <div class="diet-slot-actions"><button class="btn btn-sm btn-ghost" data-act="ordeztu" data-slota="${s.slota}">Ordeztu</button></div>
+        </div>`;
+      }
+      if (geroagokoa){
+        return banatzailea + `<div class="panel diet-slot" data-slot="${s.slota}">
+          <div class="diet-slot-name" data-dish-id="${s.errezetaId}">${escapeHtml(planErrezeta.izena)} ${hondarBadge}${aurreikuspenBadge}</div>
+          <div class="diet-slot-macros">${planB?.kaloriak ? planB.kaloriak + ' kcal' : ''}${planB?.kaloriak && planB?.proteina ? ' &middot; ' : ''}${planB?.proteina ? planB.proteina + 'g proteina' : ''}</div>
         </div>`;
       }
       return banatzailea + `<div class="panel diet-slot" data-slot="${s.slota}">
@@ -1174,12 +1266,14 @@ function renderDieta(){
     const hondarraSaila = btn.dataset.hondarra || null;
     const sarrera = { id: uuid(), slota: btn.dataset.slota, jatorria:'plana', errezetaId: btn.dataset.errezeta, izena: errezeta?.izena||'', kaloriak: b?.kaloriak ?? null, proteina: b?.proteina ?? null, razioak:1, hondarraSaila, noiz: new Date().toISOString() };
     await gehituSarrera(dietaUnekoData, sarrera);
+    aurreratuZikloa(btn.dataset.slota, +1).catch(err => console.error('Zikloa aurreratzean errorea:', err));
     if (errezeta) stokaErabiliErrezetagatik(errezeta.id, hondarraSaila, -1).catch(err => console.error('Stoka eguneratzean errorea:', err));
   }));
   slotak.querySelectorAll('[data-act="desegin"]').forEach(btn => btn.addEventListener('click', async () => {
     const sarrerak = (egunerokoaCache[dietaUnekoData]?.sarrerak) || [];
     const sarrera = sarrerak.find(s => s.id === btn.dataset.sarrera);
     await kenduSarrera(dietaUnekoData, btn.dataset.sarrera);
+    if (sarrera) aurreratuZikloa(sarrera.slota, -1).catch(err => console.error('Zikloa atzeratzean errorea:', err));
     if (sarrera && sarrera.errezetaId) stokaErabiliErrezetagatik(sarrera.errezetaId, sarrera.hondarraSaila || null, +1).catch(err => console.error('Stoka eguneratzean errorea:', err));
   }));
   slotak.querySelectorAll('[data-act="ordeztu"]').forEach(btn => btn.addEventListener('click', () => openModalOrdeztu(btn.dataset.slota)));
@@ -1254,6 +1348,7 @@ document.getElementById('ordeztuBilaketa').addEventListener('input', (ev) => {
     const b = (e.bertsioak||[])[e.unekoa] || {};
     const sarrera = { id: uuid(), slota: ordeztuSlota, jatorria:'ordezkoa', errezetaId: e.id, izena: e.izena, kaloriak: b.kaloriak ?? null, proteina: b.proteina ?? null, razioak:1, hondarraSaila:null, noiz: new Date().toISOString() };
     await gehituSarrera(dietaUnekoData, sarrera);
+    aurreratuZikloa(ordeztuSlota, +1).catch(err => console.error('Zikloa aurreratzean errorea:', err));
     stokaErabiliErrezetagatik(e.id, null, -1).catch(err => console.error('Stoka eguneratzean errorea:', err));
     modalOrdeztu.classList.remove('open');
     showToast('Otordua ordeztu da.');
@@ -1267,6 +1362,7 @@ document.getElementById('btnOrdeztuGordeAzkar').addEventListener('click', async 
   const proteina = document.getElementById('ordeztuProteinaAzkarra').value ? Number(document.getElementById('ordeztuProteinaAzkarra').value) : null;
   const sarrera = { id: uuid(), slota: ordeztuSlota, jatorria:'azkarra', errezetaId: null, izena, kaloriak, proteina, razioak:1, noiz: new Date().toISOString() };
   await gehituSarrera(dietaUnekoData, sarrera);
+  aurreratuZikloa(ordeztuSlota, +1).catch(err => console.error('Zikloa aurreratzean errorea:', err));
   modalOrdeztu.classList.remove('open');
   showToast('Otordua ordeztu da.');
 });
@@ -1319,12 +1415,14 @@ document.getElementById('btnDietaEzarpenak').addEventListener('click', () => {
     </div>`).join('');
 
   modalDietaEzarpenak.dataset.zikloHasieraData = ez.zikloHasieraData;
+  delete modalDietaEzarpenak.dataset.berrezarriAurrerapena;
   modalDietaEzarpenak.classList.add('open');
 });
 document.getElementById('btnDietaEzarpenakUtzi').addEventListener('click', () => modalDietaEzarpenak.classList.remove('open'));
 
 document.getElementById('btnZikloBerrezarri').addEventListener('click', () => {
   modalDietaEzarpenak.dataset.zikloHasieraData = dataStr(new Date());
+  modalDietaEzarpenak.dataset.berrezarriAurrerapena = '1';
   showToast('Gaur izango da zikloaren 1. eguna, gorde ondoren.');
 });
 
@@ -1340,13 +1438,25 @@ document.getElementById('btnDietaEzarpenakGorde').addEventListener('click', asyn
       afariaId: card.querySelector('.ez-afaria').value || null,
       ...(aurrekoa.gosariaHondarra ? {gosariaHondarra: aurrekoa.gosariaHondarra} : {}),
       ...(aurrekoa.bazkariaHondarra ? {bazkariaHondarra: aurrekoa.bazkariaHondarra} : {}),
-      ...(aurrekoa.afariaHondarra ? {afariaHondarra: aurrekoa.afariaHondarra} : {})
+      ...(aurrekoa.afariaHondarra ? {afariaHondarra: aurrekoa.afariaHondarra} : {}),
+      ...(aurrekoa.gosariaVarianteak ? {gosariaVarianteak: aurrekoa.gosariaVarianteak} : {}),
+      ...(aurrekoa.bazkariaVarianteak ? {bazkariaVarianteak: aurrekoa.bazkariaVarianteak} : {}),
+      ...(aurrekoa.afariaVarianteak ? {afariaVarianteak: aurrekoa.afariaVarianteak} : {})
     };
   });
+  const berrezarriAurrerapena = modalDietaEzarpenak.dataset.berrezarriAurrerapena === '1';
+  const aurrerapena = berrezarriAurrerapena
+    ? { gosaria: 0, bazkaria: 0, afaria: 0 }
+    : (dietaEzarpenak?.aurrerapena || { gosaria: 0, bazkaria: 0, afaria: 0 });
+  const aurrerapenaBiraka = berrezarriAurrerapena
+    ? { gosaria: 0, bazkaria: 0, afaria: 0 }
+    : (dietaEzarpenak?.aurrerapenaBiraka || { gosaria: 0, bazkaria: 0, afaria: 0 });
   await setDoc(ezarpenakRef, {
     helburuKalorak, helburuProteina, proteinaErrezetaId, zikloEgunak,
-    zikloHasieraData: modalDietaEzarpenak.dataset.zikloHasieraData
+    zikloHasieraData: modalDietaEzarpenak.dataset.zikloHasieraData,
+    aurrerapena, aurrerapenaBiraka
   });
+  delete modalDietaEzarpenak.dataset.berrezarriAurrerapena;
   modalDietaEzarpenak.classList.remove('open');
   showToast('Dietaren ezarpenak gorde dira.');
 });
